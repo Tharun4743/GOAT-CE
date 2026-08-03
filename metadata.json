@@ -1,0 +1,8 @@
+{
+  "name": "GOAT Code Editor",
+  "description": "A high-performance, real-time collaborative code editor with Monaco, Socket.io, and live cursor tracking.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
