@@ -119,6 +119,18 @@ goat-code-editor/
 
 ---
 
+## 🔧 Technical Stability & Editor Calibration (The "Cursor Sync" Fix)
+
+Monaco Editor relies on precise character-width measurements to map mouse coordinates (pixel X/Y) to line/column numbers. If a web font (like `Fira Code`) is still loading when Monaco mounts, Monaco measures character widths using the browser's fallback font (e.g. `Consolas` at `7.7px` instead of `Fira Code` at `8.4px`). Over a 40+ character line, this 0.7px drift accumulates to a ~4 column discrepancy, resulting in typed letters appearing in the wrong place (e.g. typing `p` before `D` in `Developer` inserts `Deveploper`).
+
+GOAT CE includes a production-grade alignment fix for this:
+- **Web Font Remeasuring:** Replaced standard layout triggers with `monaco.editor.remeasureFonts()` immediately after `document.fonts.ready` resolves.
+- **One-Shot Focus Calibration:** Registers a one-time `onDidFocusEditorText` listener to execute a secondary font remeasuring on the user's first physical interaction, ensuring Fira Code is active.
+- **Tailwind Reset Protection:** Sets `letterSpacing: 0` in Monaco options and injects `letter-spacing: 0 !important` and `font-variant-ligatures: none !important` styles onto Monaco's view-line spans to neutralize any Tailwind CDN preflight style bleeding.
+- **Clamped Document Restoration:** In the collaboration sync engine (`applyCodeToEditor`), raw cursor positions are clamped to the bounds of the newly received document using `Math.min` and tracked using `forceMoveMarkers: true`, preventing cursor jumping and offsets.
+
+---
+
 ## ⚙️ Supported Languages
 
 | Language | Syntax | Piston Execution | AI Fallback | Preview |
