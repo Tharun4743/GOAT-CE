@@ -1119,8 +1119,10 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
                     <div className="flex-1 overflow-y-auto space-y-2.5 custom-scrollbar pr-1 min-h-0 pb-3">
                       {activeUsers.map(user => {
                         const status = getUserStatus(user);
-                        const isThisUserInCallWithMe = (voiceCall.callStatus === 'connected' || voiceCall.callStatus === 'calling') && voiceCall.activePeer?.socketId === user.id;
-                        const isSelf = user.id === currentUser?.id;
+                        const isSelf = user.id === currentUser?.id || 
+                                       (Boolean(socketRef.current?.id) && user.id === socketRef.current?.id) || 
+                                       user.username === currentUser?.username;
+                        const isThisUserInCallWithMe = !isSelf && (voiceCall.callStatus === 'connected' || voiceCall.callStatus === 'calling') && voiceCall.activePeer?.socketId === user.id;
                         return (
                           <div key={user.id} className={`flex items-center gap-3 p-2.5 rounded-xl border transition-colors ${
                             theme === 'dark' ? 'bg-[#161b22] border-gray-800 hover:border-gray-700' : 'bg-white border-indigo-100 shadow-sm hover:border-indigo-200'
@@ -1136,7 +1138,14 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
                             </div>
                             <div className="flex flex-col min-w-0 flex-1">
                               <div className="flex items-center justify-between gap-1">
-                                <span className={`text-xs font-extrabold truncate ${theme === 'dark' ? 'text-gray-200' : 'text-gray-900'}`}>{user.username} {isSelf ? '(You)' : ''}</span>
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className={`text-xs font-extrabold truncate ${theme === 'dark' ? 'text-gray-200' : 'text-gray-900'}`}>{user.username}</span>
+                                  {isSelf && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                                      YOU
+                                    </span>
+                                  )}
+                                </div>
                                 
                                 {!isSelf && (
                                   <div>

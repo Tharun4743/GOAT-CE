@@ -316,7 +316,15 @@ export function useVoiceCall(
       setError('Cannot initiate call: Not connected to workspace.');
       return;
     }
-    if (targetSocketId === socket.id) return;
+    if (
+      targetSocketId === socket.id ||
+      targetUser.id === currentUser.id ||
+      targetUser.id === socket.id ||
+      targetUser.username.trim().toLowerCase() === currentUser.username.trim().toLowerCase()
+    ) {
+      console.warn('Cannot initiate self-call.');
+      return;
+    }
 
     setError(null);
     setActivePeer({ socketId: targetSocketId, user: targetUser });
