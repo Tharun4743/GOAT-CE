@@ -144,7 +144,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onJoin }) => {
                     type="text"
                     value={username}
                     onChange={(e) => { setUsername(e.target.value); setError(null); }}
-                    placeholder="Enter your name (e.g. Tharunkumar)"
+                    placeholder="Enter your name"
                     className="w-full bg-indigo-50/60 border border-indigo-100 rounded-xl px-3.5 sm:px-4 py-2.5 text-gray-800 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-300/60 focus:border-indigo-300 transition-all placeholder:text-gray-300 shadow-inner"
                   />
                   <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-indigo-300 transition-colors group-focus-within:text-indigo-400">
