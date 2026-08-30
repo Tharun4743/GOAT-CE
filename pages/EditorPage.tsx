@@ -341,16 +341,14 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
     let username = currentUser?.username;
     let color = currentUser?.color;
     if (!username) {
-      const savedUser = sessionStorage.getItem('goat_username');
-      if (savedUser) {
-        username = savedUser;
+      const savedUser = sessionStorage.getItem('goat_username') || localStorage.getItem('goat_username');
+      if (savedUser && savedUser.trim()) {
+        username = savedUser.trim();
         color = COLORS[Math.floor(Math.random() * COLORS.length)];
         setCurrentUser({ id: Math.random().toString(36).substr(2, 9), username, color });
       } else {
-        username = `Dev-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-        color = COLORS[Math.floor(Math.random() * COLORS.length)];
-        sessionStorage.setItem('goat_username', username);
-        setCurrentUser({ id: Math.random().toString(36).substr(2, 9), username, color });
+        navigate('/');
+        return;
       }
     }
 

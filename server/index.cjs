@@ -112,7 +112,22 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   } catch (err) {
     console.error('Upload Endpoint Error:', err);
     return res.status(500).json({ error: err.message || 'Internal server error during upload' });
+// Room status check endpoint (Check if a room is currently active with online members)
+app.get('/api/room-status/:roomId', (req, res) => {
+  const { roomId } = req.params;
+  if (!roomId) {
+    return res.status(400).json({ error: 'Room ID required' });
   }
+  const cleanId = roomId.trim().toUpperCase();
+  const activeMembers = Array.from(userMap.values()).filter(u => u.roomId === cleanId);
+  const exists = inMemoryRooms.has(cleanId) || activeMembers.length > 0;
+
+  return res.json({
+    roomId: cleanId,
+    exists,
+    activeUsersCount: activeMembers.length,
+    isActive: activeMembers.length > 0
+  });
 });
 
 // --- In-Memory Fallback ---

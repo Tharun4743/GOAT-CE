@@ -29,7 +29,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onJoin }) => {
     return trimmed.toUpperCase().replace(/[^A-Z0-9_-]/g, '');
   };
 
-  const handleCreateRoom = (e?: React.FormEvent) => {
+  const handleCreateRoom = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const finalUsername = username.trim();
     if (!finalUsername) {
@@ -37,6 +37,31 @@ const LandingPage: React.FC<LandingPageProps> = ({ onJoin }) => {
       return;
     }
 
+    const typedRoomId = sanitizeRoomId(roomId);
+    if (typedRoomId) {
+      // Check if room is already active
+      try {
+        const res = await fetch(`/api/room-status/${typedRoomId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.isActive || data.exists) {
+            setError(`Room "${typedRoomId}" already exists and is active! Click "Join Room" to enter this workspace, or clear the Room ID field to create a new one.`);
+            return;
+          }
+        }
+      } catch (err) {
+        // Dev fallback
+      }
+
+      setError(null);
+      sessionStorage.setItem('goat_username', finalUsername);
+      localStorage.setItem('goat_username', finalUsername);
+      onJoin(finalUsername, typedRoomId);
+      navigate(`/editor/${typedRoomId}`);
+      return;
+    }
+
+    // Auto-generate fresh unique 6-character room ID
     const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     sessionStorage.setItem('goat_username', finalUsername);
     localStorage.setItem('goat_username', finalUsername);
