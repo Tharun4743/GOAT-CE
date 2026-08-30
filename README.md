@@ -27,29 +27,30 @@
 
 </div>
 
-> **GOAT Code Editor** was engineered and recognized as the **1st Place National Winner** at **Code Thugs 2k26**, standing out for its zero-latency real-time collaboration engine, sub-pixel Monaco editor calibration, integrated 1-to-1 WebRTC voice mesh, and ephemeral auto-purging room lifecycle.
+> **GOAT Code Editor** was engineered and recognized as the **1st Place National Winner** at **Code Thugs 2k26**, standing out for its zero-latency real-time collaboration engine, sub-pixel Monaco editor calibration, integrated 1-to-1 WebRTC voice calling mesh, and ephemeral auto-purging room lifecycle.
 
 ---
 
-## 🌟 Highlights & Key Features
+## 🌟 Highlights & Core Features
 
 <div align="center">
 
 | Feature | Capabilities |
 |:---|:---|
-| 📞 **1-to-1 Direct Voice Calls** | Full duplex browser-to-browser WebRTC audio streaming. Features incoming call alert modal with phone ringtone, Accept/Decline controls, live talking indicator, and mute toggle. |
-| 🔇 **Acoustic Echo Elimination** | Hardware-level acoustic echo cancellation (AEC), noise suppression, and single-channel audio pipeline preventing feedback loops. |
-| 🧹 **Ephemeral Auto-Purge Lifecycle** | All in-memory buffers, chat messages, active calls, and snapshots are strictly partitioned per room and automatically deleted when all members exit. |
-| 🔴 **Real-time Collaboration** | Multi-user code synchronization with operational transformation and sub-pixel Monaco cursor calibration. |
+| 📞 **1-to-1 WebRTC Direct Voice** | Full-duplex browser audio streaming. Includes incoming call notification modal with synthetic telephone ringtone, Accept/Decline actions, active speaker detection, and instant mute toggle. |
+| 🔇 **Hardware Acoustic Echo Cancellation** | Built-in Acoustic Echo Cancellation (AEC), Noise Suppression (NS), and Auto Gain Control (AGC) pipeline preventing feedback loops. |
+| 🧹 **Ephemeral Auto-Purge Lifecycle** | All in-memory buffers, chat messages, active calls, and snapshots are strictly partitioned per room and automatically deleted from memory and database once all room members exit. |
+| 🔴 **Real-time Collaboration** | Multi-user live code synchronization with operational transformation and sub-pixel Monaco cursor calibration. |
 | 🎯 **Live Cursors & Presence** | See peer cursors and text selections in real-time with unique developer color badges and active typing indicators. |
-| ☀️ **Light / Dark Mode Switcher** | Dynamic theme toggle between VS-Dark and VS-Light with matching panel styling across the entire editor. |
-| 🤖 **GOAT CE AI Assistant** | Context-aware code explanations, refactoring, debugging, and unit test generation with instant code injection. |
+| 🔒 **Duplicate Room Protection** | Real-time `/api/room-status/:roomId` validation prevents accidental overwrite of active workspaces, seamlessly routing collaborators via **Join Room**. |
+| ☀️ **Light / Dark Mode Switcher** | Dynamic theme toggle between VS-Dark and VS-Light with matching panel styling across the entire editor and terminal. |
+| 🤖 **GOAT CE AI Assistant** | Context-aware code explanations, refactoring, debugging, and unit test generation with instant code injection powered by Llama 3.1 70B. |
 | ⚡ **Monaco Editor (VS Code Kernel)** | Full VS Code kernel — syntax highlighting, minimap, Fira Code ligature font, and smooth cursor animation. |
 | ↕️ **Drag-Adjustable Output Console** | Resizable bottom terminal and visual preview panel via drag handle (clamped smoothly between 120px and 85vh). |
-| 🖥️ **Built-in Terminal & Runner** | Execute 13 languages in-browser via sandboxed Piston API + AI fallback execution. |
-| 👁️ **Live HTML/CSS Preview** | Instant rendering in an embedded sandbox iframe with zero server round-trip. |
+| 🖥️ **Built-in Terminal & Runner** | Sandboxed execution for 13+ languages in-browser via Piston API v2 + AI neural execution fallback. |
+| 👁️ **Live HTML/CSS Preview** | Instant visual rendering in an embedded sandbox iframe with zero server round-trip. |
 | 💬 **Live Chat & Cloudinary Media** | In-room messaging with file and image attachment uploads powered by Cloudinary. |
-| 📸 **Code Timeline History** | Save code states per room and roll back instantly with snapshot history. |
+| 📸 **Code Timeline Snapshots** | Save code states per room and roll back instantly with snapshot timeline history. |
 | 🚀 **Render Auto-Deploy Ready** | Includes `render.yaml` Infrastructure-as-Code for zero-touch continuous deployment. |
 
 </div>
@@ -74,6 +75,31 @@ graph TD
 
 ---
 
+## 📞 1-to-1 WebRTC Direct Voice Calling Workflow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Caller as 👨‍💻 Caller (Peer A)
+    participant Signaling as ⚡ Socket.io Server
+    actor Callee as 👩‍💻 Callee (Peer B)
+
+    Caller->>Signaling: direct-call-initiate { toSocketId: Callee }
+    Signaling->>Callee: direct-call-incoming { caller: Peer A }
+    Note over Callee: Ringtone plays & Incoming Modal pops up
+    alt Accepted
+        Callee->>Signaling: direct-call-accept { toSocketId: Caller }
+        Signaling->>Caller: direct-call-accepted
+        Note over Caller,Callee: WebRTC Offer / Answer / ICE handshake (voice-signal)
+        Caller<<->>Callee: 🎙️ Direct P2P Encrypted Full-Duplex Audio Stream
+    else Declined
+        Callee->>Signaling: direct-call-reject { toSocketId: Caller }
+        Signaling->>Caller: direct-call-rejected (Ringtone stops)
+    end
+```
+
+---
+
 ## 🗂️ Project Structure
 
 ```
@@ -83,14 +109,14 @@ goat-code-editor/
 │   ├── ActiveCallBar.tsx       # Live call status dock — timer, speaking pulse, mute, end call
 │   ├── IncomingCallModal.tsx   # Incoming call alert dialog with audio ringtone & accept/reject
 │   ├── ChatBox.tsx             # Real-time team chat with Cloudinary file attachment support
-│   ├── Terminal.tsx            # Output display (Piston + AI fallback)
+│   ├── Terminal.tsx            # Theme-aware output console (Piston + AI fallback)
 │   ├── TopBar.tsx              # Language selector, Light/Dark toggle, Save, Run, Share, Room ID
 │   └── VoiceCallPanel.tsx      # Voice participant roster and audio controls
 ├── hooks/
 │   └── useVoiceCall.ts         # WebRTC 1-to-1 direct call hook, ringtones & echo cancellation
 ├── pages/
 │   ├── EditorPage.tsx          # Core editor — Monaco, Socket.io, cursors, theme, timeline, voice
-│   └── LandingPage.tsx         # Viewport-locked room join/create page (4–6 digit validation)
+│   └── LandingPage.tsx         # Modern glassmorphic room join/create page with URL parser
 ├── server/
 │   └── index.cjs               # Express 5 + Socket.io + WebRTC signaling + auto-purge backend
 ├── App.tsx                     # HashRouter + route definitions
@@ -132,11 +158,27 @@ goat-code-editor/
 
 ---
 
+## 📡 REST API & Socket.io Events Reference
+
+### REST Endpoints
+- `GET /api/room-status/:roomId` — Check whether a Room ID is currently active with online members.
+- `POST /api/upload` — Upload images or attachments for team chat via Cloudinary.
+- `GET /` — Health check endpoint for Render zero-downtime deployments.
+
+### Socket.io Events
+- `join-room` / `sync-state` / `user-joined` / `user-left` — Real-time user roster and code sync.
+- `code-change` / `code-update` / `typing-status` — Operational transformation code streaming.
+- `cursor-move` / `cursor-update` — Sub-pixel remote cursor and text selection broadcasting.
+- `direct-call-initiate` / `direct-call-accept` / `direct-call-reject` / `direct-call-end` — WebRTC 1-to-1 calling lifecycle.
+- `voice-signal` — WebRTC SDP Offer / Answer & ICE Candidate exchange.
+
+---
+
 ## 🚀 Quick Start Guide
 
 ### Prerequisites
 - **Node.js** 18+
-- **PostgreSQL** *(Optional — falls back to in-memory zero-config store if not set)*
+- **PostgreSQL** *(Optional — falls back to zero-config in-memory store if omitted)*
 - **Cloudinary Account** *(Optional — for chat image uploads)*
 - **OpenRouter API Key** *(Optional — for GOAT CE AI Assistant)*
 
