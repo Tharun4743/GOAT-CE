@@ -898,9 +898,9 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
       if (stdout) out.push(stdout);
       if (!stdout && !stderr) out.push('[System] Execution finished (No output)');
 
-      setTerminalOutput([`$ GOAT CE Simulation (v3.0.1)`, ...out.join('\n').split('\n')]);
+      setTerminalOutput([`GOAT Code Runtime (${language.toUpperCase()})`, ...out.join('\n').split('\n')]);
     } catch (err) {
-      setTerminalOutput(prev => [...prev, `[Critical Error] Simulation kernel failed: ${err}`]);
+      setTerminalOutput(prev => [...prev, `[Critical Error] Runtime kernel failed: ${err}`]);
     }
   };
 
@@ -909,7 +909,7 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
     const code = editorRef.current.getValue();
     setIsTerminalOpen(true);
     setIsExecuting(true);
-    setTerminalOutput([`$ Initializing runtime for ${language.toUpperCase()}...`]);
+    setTerminalOutput([`Initializing runtime for ${language.toUpperCase()}...`]);
 
     const pistonConfig = PISTON_LANG_MAP[language];
     if (['html', 'css', 'javascript'].includes(language)) {
@@ -1259,29 +1259,45 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
           {isTerminalOpen && (
             <div
               style={{ height: `${terminalHeight}px` }}
-              className="bg-[#0d1117] border-t border-gray-800 flex flex-col font-mono text-sm shadow-[0_-10px_30px_rgba(0,0,0,0.6)] z-40 relative shrink-0 min-h-[120px] max-h-[85vh]"
+              className={`border-t flex flex-col font-mono text-sm shadow-[0_-10px_30px_rgba(0,0,0,0.15)] z-40 relative shrink-0 min-h-[120px] max-h-[85vh] ${
+                theme === 'dark' ? 'bg-[#0d1117] border-gray-800' : 'bg-white border-slate-200'
+              }`}
             >
               {/* Drag Resize Handle Bar */}
               <div
                 onMouseDown={handleTerminalResizeStart}
-                className="h-2 w-full cursor-row-resize bg-[#161b22] hover:bg-indigo-600/30 transition-colors flex items-center justify-center shrink-0 group select-none border-b border-gray-800/80"
+                className={`h-2 w-full cursor-row-resize transition-colors flex items-center justify-center shrink-0 group select-none border-b ${
+                  theme === 'dark' ? 'bg-[#161b22] hover:bg-indigo-600/30 border-gray-800/80' : 'bg-slate-100 hover:bg-indigo-100 border-slate-200'
+                }`}
                 title="Drag up or down to adjust panel height"
               >
-                <div className="w-12 h-1 rounded-full bg-gray-600 group-hover:bg-indigo-400 transition-colors" />
+                <div className={`w-12 h-1 rounded-full transition-colors ${
+                  theme === 'dark' ? 'bg-gray-600 group-hover:bg-indigo-400' : 'bg-slate-400 group-hover:bg-indigo-500'
+                }`} />
               </div>
 
-              <div className="flex items-center justify-between px-4 py-1.5 bg-[#161b22] border-b border-gray-800 shrink-0">
+              <div className={`flex items-center justify-between px-4 py-1.5 border-b shrink-0 ${
+                theme === 'dark' ? 'bg-[#161b22] border-gray-800' : 'bg-slate-100 border-slate-200'
+              }`}>
                 <div className="flex items-center gap-6">
                   <div className="flex gap-2">
                     <button
                       onClick={() => setBottomTab('terminal')}
-                      className={`text-[10px] font-bold uppercase tracking-wider py-1 transition-all ${bottomTab === 'terminal' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'}`}
+                      className={`text-[10px] font-black uppercase tracking-wider py-1 transition-all ${
+                        bottomTab === 'terminal' 
+                          ? 'text-indigo-500 border-b-2 border-indigo-500' 
+                          : theme === 'dark' ? 'text-gray-500 hover:text-gray-300' : 'text-slate-500 hover:text-slate-700'
+                      }`}
                     >
                       Output Logs
                     </button>
                     <button
                       onClick={() => setBottomTab('preview')}
-                      className={`text-[10px] font-bold uppercase tracking-wider py-1 transition-all ${bottomTab === 'preview' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'}`}
+                      className={`text-[10px] font-black uppercase tracking-wider py-1 transition-all ${
+                        bottomTab === 'preview' 
+                          ? 'text-indigo-500 border-b-2 border-indigo-500' 
+                          : theme === 'dark' ? 'text-gray-500 hover:text-gray-300' : 'text-slate-500 hover:text-slate-700'
+                      }`}
                     >
                       Visual Preview
                     </button>
@@ -1289,11 +1305,18 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="flex gap-1.5">
-                    <div className="w-2 h-2 rounded-full bg-[#ff5f56]/70"></div>
-                    <div className="w-2 h-2 rounded-full bg-[#ffbd2e]/70"></div>
-                    <div className="w-2 h-2 rounded-full bg-[#27c93f]/70"></div>
+                    <div className="w-2 h-2 rounded-full bg-[#ff5f56]/80"></div>
+                    <div className="w-2 h-2 rounded-full bg-[#ffbd2e]/80"></div>
+                    <div className="w-2 h-2 rounded-full bg-[#27c93f]/80"></div>
                   </div>
-                  <button onClick={() => setIsTerminalOpen(false)} className="text-gray-500 hover:text-white transition-colors text-xs font-bold p-1">✕</button>
+                  <button 
+                    onClick={() => setIsTerminalOpen(false)} 
+                    className={`transition-colors text-xs font-bold p-1 ${
+                      theme === 'dark' ? 'text-gray-500 hover:text-white' : 'text-slate-400 hover:text-slate-800'
+                    }`}
+                  >
+                    ✕
+                  </button>
                 </div>
               </div>
 
