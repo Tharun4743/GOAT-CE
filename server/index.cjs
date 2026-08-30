@@ -282,7 +282,101 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('receive-message', message);
   });
 
-  // --- Direct 1-to-1 WebRTC Voice Call Signaling ---
+  // --- 1-to-Many Group WebRTC Voice Signaling ---
+  socket.on('voice-join-room', ({ roomId, user }) => {
+    if (!roomId) return;
+    if (!voiceRooms.has(roomId)) {
+      voiceRooms.set(roomId, new Map());
+    }
+    const roomVoice = voiceRooms.get(roomId);
+
+    // Collect existing voice peers to send to joining participant
+    const existingPeers = Array.from(roomVoice.values()).map(p => ({
+      socketId: p.socketId,
+      user: p.user,
+      isMuted: p.isMuted || false,
+      isDeafened: p.isDeafened || false
+    }));
+
+    roomVoice.set(socket.id, {
+      socketId: socket.id,
+      user: user || { id: socket.id, username: 'Anonymous', color: '#6366f1' },
+      isMuted: false,
+      isDeafened: false,
+      roomId
+    });
+
+    // Send existing peers in call to the newly joined peer
+    socket.emit('voice-room-peers', { peers: existingPeers });
+
+    // Broadcast to other users in room that this user joined voice
+    socket.to(roomId).emit('voice-peer-joined', {
+      socketId: socket.id,
+      user: user || { id: socket.id, username: 'Anonymous', color: '#6366f1' },
+      isMuted: false,
+      isDeafened: false
+    });
+
+    console.log(`🎙️ ${user?.username || socket.id} joined voice in room ${roomId} (Total: ${roomVoice.size})`);
+  });
+
+  socket.on('voice-leave-room', ({ roomId }) => {
+    if (!roomId) return;
+    const roomVoice = voiceRooms.get(roomId);
+    if (roomVoice && roomVoice.has(socket.id)) {
+      roomVoice.delete(socket.id);
+      socket.to(roomId).emit('voice-peer-left', { socketId: socket.id });
+      console.log(`📴 User ${socket.id} left voice in room ${roomId} (Remaining: ${roomVoice.size})`);
+      if (roomVoice.size === 0) {
+        voiceRooms.delete(roomId);
+      }
+    }
+  });
+
+  socket.on('voice-group-call-initiate', ({ roomId, caller }) => {
+    if (!roomId) return;
+    socket.to(roomId).emit('voice-group-call-incoming', {
+      callerSocketId: socket.id,
+      caller,
+      roomId
+    });
+    console.log(`📢 Group call initiated by ${caller?.username || socket.id} in room ${roomId}`);
+  });
+
+  socket.on('voice-signal', ({ to, signal }) => {
+    if (!to || to === socket.id) return;
+    // Relay WebRTC offer / answer / ICE candidate directly between peers
+    io.to(to).emit('voice-signal', {
+      from: socket.id,
+      signal
+    });
+  });
+
+  socket.on('voice-status-update', ({ roomId, toSocketId, isMuted, isDeafened, isSpeaking }) => {
+    if (roomId) {
+      const roomVoice = voiceRooms.get(roomId);
+      if (roomVoice && roomVoice.has(socket.id)) {
+        const peer = roomVoice.get(socket.id);
+        if (isMuted !== undefined) peer.isMuted = isMuted;
+        if (isDeafened !== undefined) peer.isDeafened = isDeafened;
+      }
+      socket.to(roomId).emit('voice-peer-status', {
+        socketId: socket.id,
+        isMuted,
+        isDeafened,
+        isSpeaking
+      });
+    } else if (toSocketId) {
+      io.to(toSocketId).emit('voice-peer-status', {
+        socketId: socket.id,
+        isMuted,
+        isDeafened,
+        isSpeaking
+      });
+    }
+  });
+
+  // --- Direct 1-to-1 WebRTC Voice Call Signaling (Backwards compatible) ---
   socket.on('direct-call-initiate', ({ toSocketId, caller }) => {
     if (!toSocketId || toSocketId === socket.id) return;
     io.to(toSocketId).emit('direct-call-incoming', {
@@ -314,24 +408,6 @@ io.on('connection', (socket) => {
       fromSocketId: socket.id
     });
     console.log(`📴 Call ended between ${socket.id} and ${toSocketId}`);
-  });
-
-  socket.on('voice-signal', ({ to, signal }) => {
-    if (!to || to === socket.id) return;
-    // Relay WebRTC offer / answer / ICE candidate directly between peers
-    io.to(to).emit('voice-signal', {
-      from: socket.id,
-      signal
-    });
-  });
-
-  socket.on('voice-status-update', ({ toSocketId, isMuted }) => {
-    if (toSocketId) {
-      io.to(toSocketId).emit('voice-peer-status', {
-        socketId: socket.id,
-        isMuted
-      });
-    }
   });
 
 // Purge all data associated with a room when all users have left

@@ -689,12 +689,16 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
       {voiceCall.callStatus !== 'idle' && (
         <ActiveCallBar
           callStatus={voiceCall.callStatus}
+          voicePeers={voiceCall.voicePeers}
           activePeer={voiceCall.activePeer}
+          currentUser={currentUser}
           isMuted={voiceCall.isMuted}
+          isDeafened={voiceCall.isDeafened}
           localIsSpeaking={voiceCall.localIsSpeaking}
           peerIsSpeaking={voiceCall.peerIsSpeaking}
           callDuration={voiceCall.callDuration}
           onToggleMute={voiceCall.toggleMute}
+          onToggleDeafen={voiceCall.toggleDeafen}
           onEndCall={voiceCall.endActiveCall}
           theme={theme}
         />
@@ -734,15 +738,39 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
               <div className="h-full flex flex-col min-h-0">
                 {activeTab === 'users' && (
                   <div className="flex flex-col h-full bg-transparent min-h-0">
-                    <div className={`shrink-0 px-3 py-2.5 border-b mb-3 flex items-center justify-between ${theme === 'dark' ? 'border-gray-800' : 'border-indigo-100'}`}>
-                      <h3 className={`text-xs font-black uppercase tracking-wider flex items-center gap-2 ${theme === 'dark' ? 'text-gray-200' : 'text-slate-700'}`}>
-                        {ICONS.Users} Team Engine
-                      </h3>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                        theme === 'dark' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-indigo-50 text-indigo-600 border-indigo-200'
-                      }`}>
-                        {activeUsers.length} Online
-                      </span>
+                    <div className={`shrink-0 px-3 py-2.5 border-b mb-3 flex items-center justify-between gap-2 ${theme === 'dark' ? 'border-gray-800' : 'border-indigo-100'}`}>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <h3 className={`text-xs font-black uppercase tracking-wider flex items-center gap-2 truncate ${theme === 'dark' ? 'text-gray-200' : 'text-slate-700'}`}>
+                          {ICONS.Users} Team Engine
+                        </h3>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full border shrink-0 ${
+                          theme === 'dark' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-indigo-50 text-indigo-600 border-indigo-200'
+                        }`}>
+                          {activeUsers.length}
+                        </span>
+                      </div>
+
+                      {/* 1-to-Many Group Voice Call Button */}
+                      {voiceCall.callStatus === 'idle' ? (
+                        <button
+                          onClick={voiceCall.callRoom}
+                          className="py-1 px-2 rounded-lg text-[9px] font-extrabold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 transition-all flex items-center gap-1 shadow-sm shrink-0"
+                          title="Broadcast / Call All Workspace Members (1-to-many)"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z" />
+                          </svg>
+                          <span>Call Room</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={voiceCall.leaveVoiceCall}
+                          className="py-1 px-2 rounded-lg text-[9px] font-extrabold text-white bg-red-600 hover:bg-red-500 active:scale-95 transition-all flex items-center gap-1 shadow-sm shrink-0"
+                          title="Leave active voice channel"
+                        >
+                          <span>Leave</span>
+                        </button>
+                      )}
                     </div>
 
                     <div className="flex-1 overflow-y-auto space-y-2.5 custom-scrollbar pr-1 min-h-0 pb-3">
@@ -751,14 +779,17 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
                         const isSelf = user.id === currentUser?.id || 
                                        (Boolean(socketRef.current?.id) && user.id === socketRef.current?.id) || 
                                        user.username === currentUser?.username;
-                        const isThisUserInCallWithMe = !isSelf && (voiceCall.callStatus === 'connected' || voiceCall.callStatus === 'calling') && voiceCall.activePeer?.socketId === user.id;
+                        const peerVoiceState = voiceCall.voicePeers.find(p => p.socketId === user.id || p.user?.id === user.id);
+                        const isThisUserInCallWithMe = !isSelf && Boolean(peerVoiceState);
+                        const isPeerSpeaking = peerVoiceState?.isSpeaking || false;
+
                         return (
                           <div key={user.id} className={`flex items-center gap-3 p-2.5 rounded-xl border transition-colors ${
                             theme === 'dark' ? 'bg-[#161b22] border-gray-800 hover:border-gray-700' : 'bg-white border-indigo-100 shadow-sm hover:border-indigo-200'
                           }`}>
                             <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black text-white shadow-lg shrink-0 relative" style={{ backgroundColor: user.color }}>
                               {user.username.charAt(0).toUpperCase()}
-                              {isThisUserInCallWithMe && voiceCall.peerIsSpeaking && (
+                              {isThisUserInCallWithMe && isPeerSpeaking && (
                                 <span className="absolute -inset-0.5 rounded-lg border-2 border-emerald-400 animate-ping opacity-75 pointer-events-none"></span>
                               )}
                               {isSelf && voiceCall.callStatus === 'connected' && voiceCall.localIsSpeaking && (
@@ -778,10 +809,10 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
                                 
                                 {!isSelf && (
                                   <div>
-                                    {voiceCall.callStatus === 'connected' && voiceCall.activePeer?.socketId === user.id ? (
+                                    {isThisUserInCallWithMe ? (
                                       <span className="flex items-center gap-1 text-[8px] font-black text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full border border-emerald-500/30">
                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                                        Connected
+                                        In Voice
                                       </span>
                                     ) : voiceCall.callStatus === 'calling' && voiceCall.activePeer?.socketId === user.id ? (
                                       <span className="flex items-center gap-1 text-[8px] font-black text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded-full border border-indigo-500/30 animate-pulse">
@@ -790,8 +821,7 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
                                     ) : (
                                       <button
                                         onClick={() => voiceCall.initiateCall(user.id, user)}
-                                        disabled={voiceCall.callStatus !== 'idle'}
-                                        className="py-1 px-2.5 rounded-lg text-[9px] font-extrabold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 transition-all flex items-center gap-1 shadow-sm disabled:opacity-30"
+                                        className="py-1 px-2.5 rounded-lg text-[9px] font-extrabold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 transition-all flex items-center gap-1 shadow-sm"
                                         title={`Direct call ${user.username}`}
                                       >
                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -975,6 +1005,7 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
       {voiceCall.incomingCall && (
         <IncomingCallModal
           caller={voiceCall.incomingCall.caller}
+          isGroup={voiceCall.incomingCall.isGroup}
           onAccept={voiceCall.acceptIncomingCall}
           onReject={voiceCall.rejectIncomingCall}
           theme={theme}

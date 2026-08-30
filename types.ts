@@ -20,10 +20,12 @@ export interface ChatMessage {
 export interface VoicePeer {
   socketId: string;
   user: User;
-  isMuted: boolean;
-  isDeafened: boolean;
+  isMuted?: boolean;
+  isDeafened?: boolean;
   isSpeaking?: boolean;
 }
+
+export type CallStatus = 'idle' | 'calling' | 'incoming' | 'connected';
 
 export interface RoomState {
   roomId: string;

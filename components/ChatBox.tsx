@@ -103,12 +103,16 @@ const ChatBox: React.FC<ChatBoxProps> = ({ messages, onSendMessage, theme = 'dar
         <div className="mb-3">
           <ActiveCallBar
             callStatus={voiceCall.callStatus}
+            voicePeers={voiceCall.voicePeers}
             activePeer={voiceCall.activePeer}
+            currentUser={currentUser}
             isMuted={voiceCall.isMuted}
+            isDeafened={voiceCall.isDeafened}
             localIsSpeaking={voiceCall.localIsSpeaking}
             peerIsSpeaking={voiceCall.peerIsSpeaking}
             callDuration={voiceCall.callDuration}
             onToggleMute={voiceCall.toggleMute}
+            onToggleDeafen={voiceCall.toggleDeafen}
             onEndCall={voiceCall.endActiveCall}
             theme={theme}
           />

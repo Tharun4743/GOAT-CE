@@ -3,6 +3,7 @@ import { User } from '../types';
 
 interface IncomingCallModalProps {
   caller: User;
+  isGroup?: boolean;
   onAccept: () => void;
   onReject: () => void;
   theme?: 'dark' | 'light';
@@ -10,6 +11,7 @@ interface IncomingCallModalProps {
 
 const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
   caller,
+  isGroup = false,
   onAccept,
   onReject,
   theme = 'dark'
@@ -39,10 +41,12 @@ const IncomingCallModal: React.FC<IncomingCallModalProps> = ({
         <h3 className="text-lg font-black tracking-tight">{caller.username}</h3>
         <p className="text-xs font-semibold text-emerald-400 mt-1 flex items-center gap-1.5 animate-pulse">
           <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-          Incoming Voice Call...
+          {isGroup ? 'Group Voice Call (1-to-Many)...' : 'Incoming Voice Call...'}
         </p>
         <p className={`text-[11px] mt-2 mb-6 ${isDark ? 'text-gray-400' : 'text-slate-500'}`}>
-          Real-time collaborative audio link requested.
+          {isGroup
+            ? `${caller.username} invited the workspace to a 1-to-many group voice call.`
+            : 'Real-time collaborative audio link requested.'}
         </p>
 
         {/* Action Buttons */}
