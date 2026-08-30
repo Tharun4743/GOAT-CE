@@ -17,7 +17,6 @@
 [![Socket.io](https://img.shields.io/badge/Socket.io-4.8-010101?style=flat-square&logo=socket.io&logoColor=white)](https://socket.io)
 [![WebRTC](https://img.shields.io/badge/WebRTC-Audio_Call-339933?style=flat-square&logo=webrtc&logoColor=white)](https://webrtc.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org)
-[![Cloudinary](https://img.shields.io/badge/Cloudinary-Media-3448C5?style=flat-square&logo=cloudinary&logoColor=white)](https://cloudinary.com)
 [![Express](https://img.shields.io/badge/Express-5.2-000000?style=flat-square&logo=express&logoColor=white)](https://expressjs.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-F59E0B?style=flat-square)](./LICENSE)
 
@@ -43,7 +42,7 @@
 | ↕️ **Drag-Adjustable Output Console** | Resizable bottom terminal and visual preview panel via drag handle (clamped smoothly between 120px and 85vh). |
 | 🖥️ **Built-in Terminal & Runner** | Sandboxed execution for 13+ languages in-browser via Piston API v2 + AI neural execution fallback. |
 | 👁️ **Live HTML/CSS Preview** | Instant visual rendering in an embedded sandbox iframe with zero server round-trip. |
-| 💬 **Live Chat & Cloudinary Media** | In-room messaging with file and image attachment uploads powered by Cloudinary. |
+| 💬 **Live Workspace Chat** | Instant real-time team messaging partitioned per room. |
 | 📸 **Code Timeline Snapshots** | Save code states per room and roll back instantly with snapshot timeline history. |
 | 🚀 **Render Auto-Deploy Ready** | Includes `render.yaml` Infrastructure-as-Code for zero-touch continuous deployment. |
 
@@ -61,7 +60,6 @@ graph TD
 
     Server -->|Persist Room & Snapshots| DB[(🐘 PostgreSQL Database)]
     Server -->|In-Memory Buffer| Cache[(⚡ Ephemeral Room Cache)]
-    Server -->|Media Storage| Cloudinary[(☁️ Cloudinary Media)]
     
     ClientA -->|Code Execution| Piston[⚡ Piston API v2 Sandbox]
     ClientA -->|AI Refactor & Runner| OpenRouter[🤖 OpenRouter AI - Llama 3.1 70B]
@@ -102,7 +100,7 @@ goat-code-editor/
 │   ├── AIAssistant.tsx         # GOAT CE AI panel — OpenRouter, quick actions, code injection
 │   ├── ActiveCallBar.tsx       # Live call status dock — timer, speaking pulse, mute, end call
 │   ├── IncomingCallModal.tsx   # Incoming call alert dialog with audio ringtone & accept/reject
-│   ├── ChatBox.tsx             # Real-time team chat with Cloudinary file attachment support
+│   ├── ChatBox.tsx             # Real-time team workspace chat
 │   ├── Terminal.tsx            # Theme-aware output console (Piston + AI fallback)
 │   ├── TopBar.tsx              # Language selector, Light/Dark toggle, Save, Run, Share, Room ID
 │   └── VoiceCallPanel.tsx      # Voice participant roster and audio controls
@@ -156,7 +154,6 @@ goat-code-editor/
 
 ### REST Endpoints
 - `GET /api/room-status/:roomId` — Check whether a Room ID is currently active with online members.
-- `POST /api/upload` — Upload images or attachments for team chat via Cloudinary.
 - `GET /` — Health check endpoint for Render zero-downtime deployments.
 
 ### Socket.io Events
@@ -173,7 +170,6 @@ goat-code-editor/
 ### Prerequisites
 - **Node.js** 18+
 - **PostgreSQL** *(Optional — falls back to zero-config in-memory store if omitted)*
-- **Cloudinary Account** *(Optional — for chat image uploads)*
 - **OpenRouter API Key** *(Optional — for GOAT CE AI Assistant)*
 
 ### 1. Clone & Install
@@ -208,7 +204,6 @@ npm run dev     # Frontend on http://localhost:3000
 | **Voice Streaming** | WebRTC `RTCPeerConnection` · Web Audio API Analyser |
 | **Backend & REST API** | Express 5.2 (CommonJS) · Node.js |
 | **Database & Persistence** | PostgreSQL (`pg`) · In-Memory Fallback Map |
-| **Cloud Storage** | Cloudinary API v2 · Multer Memory Engine |
 | **AI Intelligence** | OpenRouter — Llama 3.1 70B Instruct |
 | **Deployment Engine** | Render Cloud Blueprint (`render.yaml`) |
 

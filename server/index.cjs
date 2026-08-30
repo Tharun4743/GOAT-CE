@@ -4,8 +4,6 @@ const { Server } = require('socket.io');
 const { Pool } = require('pg');
 const cors = require('cors');
 const path = require('path');
-const multer = require('multer');
-const { v2: cloudinary } = require('cloudinary');
 require('dotenv').config();
 
 const app = express();
@@ -76,96 +74,6 @@ if (DATABASE_URL) {
   console.log('ℹ️ DATABASE_URL not set. Running in-memory database store.');
 }
 
-// --- Cloudinary & Multer Setup ---
-const uploadsDir = path.join(__dirname, '../uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-app.use('/uploads', express.static(uploadsDir));
-
-const cleanCloudName = (process.env.CLOUDINARY_CLOUD_NAME || '').trim().replace(/^['"]|['"]$/g, '');
-const cleanApiKey = (process.env.CLOUDINARY_API_KEY || '').trim().replace(/^['"]|['"]$/g, '');
-const cleanApiSecret = (process.env.CLOUDINARY_API_SECRET || '').trim().replace(/^['"]|['"]$/g, '');
-
-if (cleanCloudName && cleanApiKey && cleanApiSecret) {
-  cloudinary.config({
-    cloud_name: cleanCloudName,
-    api_key: cleanApiKey,
-    api_secret: cleanApiSecret
-  });
-}
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 } // 25MB limit
-});
-
-// Upload Endpoint for Images & Files (with automatic local fallback)
-app.post('/api/upload', upload.single('file'), async (req, res) => {
-  try {
-    if (!req.file && (!req.body || !req.body.image)) {
-      return res.status(400).json({ error: 'No file or image payload provided' });
-    }
-
-    // Helper to save file locally
-    const saveLocally = () => {
-      const fileBuffer = req.file
-        ? req.file.buffer
-        : Buffer.from(req.body.image.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-      const originalName = req.file?.originalname || 'upload.png';
-      const ext = path.extname(originalName) || '.png';
-      const filename = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}${ext}`;
-      const filePath = path.join(uploadsDir, filename);
-      fs.writeFileSync(filePath, fileBuffer);
-      return { url: `/uploads/${filename}`, filename: originalName };
-    };
-
-    // If Cloudinary credentials are fully configured, attempt Cloudinary upload
-    if (cleanCloudName && cleanApiKey && cleanApiSecret) {
-      if (req.file) {
-        try {
-          const result = await new Promise((resolve, reject) => {
-            const uploadStream = cloudinary.uploader.upload_stream(
-              {
-                folder: 'goat_editor',
-                resource_type: 'auto'
-              },
-              (error, responseResult) => {
-                if (error) reject(error);
-                else resolve(responseResult);
-              }
-            );
-            uploadStream.end(req.file.buffer);
-          });
-          return res.json({ success: true, url: result.secure_url, public_id: result.public_id });
-        } catch (cloudErr) {
-          console.warn('⚠️ Cloudinary stream upload failed, saving locally:', cloudErr.message);
-          const localResult = saveLocally();
-          return res.json({ success: true, url: localResult.url });
-        }
-      } else if (req.body && req.body.image) {
-        try {
-          const result = await cloudinary.uploader.upload(req.body.image, {
-            folder: 'goat_editor',
-            resource_type: 'auto'
-          });
-          return res.json({ success: true, url: result.secure_url, public_id: result.public_id });
-        } catch (cloudErr) {
-          console.warn('⚠️ Cloudinary upload failed, saving locally:', cloudErr.message);
-          const localResult = saveLocally();
-          return res.json({ success: true, url: localResult.url });
-        }
-      }
-    } else {
-      // Cloudinary not configured, store locally
-      const localResult = saveLocally();
-      return res.json({ success: true, url: localResult.url });
-    }
-  } catch (err) {
-    console.error('Upload Endpoint Error:', err);
-    return res.status(500).json({ error: err.message || 'Internal server error during upload' });
-  }
-});
 
 // Room status check endpoint (Check if a room is currently active with online members)
 app.get('/api/room-status/:roomId', (req, res) => {
@@ -462,32 +370,32 @@ io.on('connection', (socket) => {
     console.log(`📴 Call ended between ${socket.id} and ${toSocketId}`);
   });
 
-// Purge all data associated with a room when all users have left
-async function purgeRoomIfEmpty(roomId) {
-  if (!roomId) return;
-  // Count active users in this room (excluding disconnected sockets)
-  const activeMembers = Array.from(userMap.values()).filter(u => u.roomId === roomId);
-  if (activeMembers.length === 0) {
-    // 1. Purge in-memory editor data & snapshots
-    if (inMemoryRooms.has(roomId)) {
-      inMemoryRooms.delete(roomId);
-    }
-    // 2. Purge voice room & active voice peers
-    if (voiceRooms.has(roomId)) {
-      voiceRooms.delete(roomId);
-    }
-    // 3. Purge database room records & snapshots if PostgreSQL is connected
-    if (isPgConnected && pool) {
-      try {
-        await pool.query('DELETE FROM snapshots WHERE room_id = $1', [roomId]);
-        await pool.query('DELETE FROM rooms WHERE room_id = $1', [roomId]);
-      } catch (err) {
-        console.warn(`Database purge warning for room ${roomId}:`, err.message);
+  // Purge all data associated with a room when all users have left
+  async function purgeRoomIfEmpty(roomId) {
+    if (!roomId) return;
+    // Count active users in this room (excluding disconnected sockets)
+    const activeMembers = Array.from(userMap.values()).filter(u => u.roomId === roomId);
+    if (activeMembers.length === 0) {
+      // 1. Purge in-memory editor data & snapshots
+      if (inMemoryRooms.has(roomId)) {
+        inMemoryRooms.delete(roomId);
       }
+      // 2. Purge voice room & active voice peers
+      if (voiceRooms.has(roomId)) {
+        voiceRooms.delete(roomId);
+      }
+      // 3. Purge database room records & snapshots if PostgreSQL is connected
+      if (isPgConnected && pool) {
+        try {
+          await pool.query('DELETE FROM snapshots WHERE room_id = $1', [roomId]);
+          await pool.query('DELETE FROM rooms WHERE room_id = $1', [roomId]);
+        } catch (err) {
+          console.warn(`Database purge warning for room ${roomId}:`, err.message);
+        }
+      }
+      console.log(`🧹 [AUTO-PURGE] Room '${roomId}' is closed. All code, chat, snapshots, and voice data deleted.`);
     }
-    console.log(`🧹 [AUTO-PURGE] Room '${roomId}' is closed. All code, chat, snapshots, and voice data deleted.`);
   }
-}
 
   socket.on('leave-room', async ({ roomId }) => {
     socket.leave(roomId);

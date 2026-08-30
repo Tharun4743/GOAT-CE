@@ -12,9 +12,7 @@ interface ChatBoxProps {
 
 const ChatBox: React.FC<ChatBoxProps> = ({ messages, onSendMessage, theme = 'dark', voiceCall, currentUser }) => {
   const [inputText, setInputText] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const isDark = theme === 'dark';
 
   useEffect(() => {
@@ -30,92 +28,6 @@ const ChatBox: React.FC<ChatBoxProps> = ({ messages, onSendMessage, theme = 'dar
     setInputText('');
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-
-      const data = await response.json();
-      if (data.success && data.url) {
-        const isImg = file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg)$/i.test(file.name);
-        if (isImg) {
-          onSendMessage(`🖼️ Image: ${data.url}`);
-        } else {
-          onSendMessage(`📎 Attachment (${file.name}): ${data.url}`);
-        }
-      } else {
-        alert(`Upload failed: ${data.error || 'Unknown error'}`);
-      }
-    } catch (err: any) {
-      console.error('File upload failed:', err);
-      alert('Upload failed. Please check server logs.');
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const renderMessageContent = (text: string) => {
-    // 1. Image match (Cloudinary, web URL, or local /uploads/)
-    const imageUrlMatch = text.match(/(https?:\/\/[^\s]+?\.(?:png|jpg|jpeg|gif|webp|svg)|https?:\/\/res\.cloudinary\.com\/[^\s]+|\/uploads\/[^\s]+?\.(?:png|jpg|jpeg|gif|webp|svg))/i);
-    if (imageUrlMatch) {
-      const imageUrl = imageUrlMatch[0];
-      const cleanText = text.replace(imageUrl, '').replace(/^(🖼️ Image:\s*|🖼️ Image uploaded:\s*)/, '').trim();
-      return (
-        <div className="space-y-2">
-          {cleanText && <div>{cleanText}</div>}
-          <div className={`rounded-lg overflow-hidden border max-w-xs ${isDark ? 'border-gray-700 bg-gray-900/80' : 'border-slate-300 bg-white'}`}>
-            <a href={imageUrl} target="_blank" rel="noopener noreferrer">
-              <img src={imageUrl} alt="Attached asset" className="max-h-48 w-auto object-cover hover:opacity-90 transition-opacity" />
-            </a>
-          </div>
-        </div>
-      );
-    }
-
-    // 2. Generic File Attachment match (pdf, doc, zip, etc.)
-    const fileUrlMatch = text.match(/(https?:\/\/[^\s]+|\/uploads\/[^\s]+)/i);
-    if (fileUrlMatch && (text.includes('Attachment') || text.includes('/uploads/'))) {
-      const fileUrl = fileUrlMatch[0];
-      const cleanText = text.replace(fileUrl, '').replace(/^📎 Attachment\s*(\([^)]+\))?:\s*/, '').trim();
-      const fileName = fileUrl.split('/').pop() || 'Download Attachment';
-      return (
-        <div className="space-y-2">
-          {cleanText && <div>{cleanText}</div>}
-          <a
-            href={fileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            download
-            className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-bold transition-all max-w-xs ${
-              isDark
-                ? 'bg-gray-800/80 border-gray-700 text-indigo-400 hover:bg-gray-700 hover:text-indigo-300'
-                : 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
-            }`}
-          >
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-100 text-indigo-600'}`}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <span className="truncate flex-1">{fileName}</span>
-          </a>
-        </div>
-      );
-    }
-
-    return <div>{text}</div>;
-  };
-
   return (
     <div className="flex flex-col h-full bg-transparent min-h-0">
       <div className={`shrink-0 px-3 py-2.5 border-b mb-3 flex items-center justify-between ${isDark ? 'border-gray-800' : 'border-indigo-100'}`}>
@@ -125,19 +37,14 @@ const ChatBox: React.FC<ChatBoxProps> = ({ messages, onSendMessage, theme = 'dar
           </svg>
           Workspace Chat
         </h3>
-        {isUploading ? (
-          <span className="text-[10px] text-indigo-400 font-mono animate-pulse">Uploading...</span>
-        ) : (
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-            isDark ? 'bg-gray-800/60 text-gray-400 border-gray-700/60' : 'bg-slate-100 text-slate-500 border-slate-200'
-          }`}>
-            {messages.length} {messages.length === 1 ? 'msg' : 'msgs'}
-          </span>
-        )}
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+          isDark ? 'bg-gray-800/60 text-gray-400 border-gray-700/60' : 'bg-slate-100 text-slate-500 border-slate-200'
+        }`}>
+          {messages.length} {messages.length === 1 ? 'msg' : 'msgs'}
+        </span>
       </div>
 
-      
-      <div 
+      <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-1 min-h-0 pb-3"
       >
@@ -162,7 +69,7 @@ const ChatBox: React.FC<ChatBoxProps> = ({ messages, onSendMessage, theme = 'dar
               <div className={`rounded-xl p-2.5 text-xs border break-words shadow-sm ${
                 isDark ? 'bg-[#161b22] text-gray-200 border-gray-800' : 'bg-slate-100 text-slate-800 border-slate-200'
               }`}>
-                {renderMessageContent(msg.text)}
+                {msg.text}
               </div>
             </div>
           ))
@@ -170,48 +77,26 @@ const ChatBox: React.FC<ChatBoxProps> = ({ messages, onSendMessage, theme = 'dar
       </div>
 
       <form onSubmit={handleSubmit} className={`shrink-0 mt-2 pt-2.5 border-t ${isDark ? 'border-gray-800' : 'border-slate-200'}`}>
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          onChange={handleFileUpload} 
-          accept="image/*,.pdf,.doc,.docx" 
-          className="hidden" 
-        />
-        <div className="relative flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            title="Upload image/asset to Cloudinary"
-            className={`p-2 rounded-xl transition-colors disabled:opacity-50 border ${
-              isDark ? 'text-gray-400 hover:text-indigo-400 bg-[#161b22] border-gray-700' : 'text-slate-600 hover:text-indigo-600 bg-slate-100 border-slate-300'
+        <div className="relative flex items-center">
+          <input
+            type="text"
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder="Type a message..."
+            className={`w-full rounded-xl py-2.5 pl-3.5 pr-10 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all border ${
+              isDark ? 'bg-[#161b22] border-gray-700 text-white placeholder:text-gray-500' : 'bg-slate-100 border-slate-300 text-slate-800 placeholder:text-slate-400'
             }`}
+          />
+          <button
+            type="submit"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-indigo-500 hover:text-indigo-400 transition-colors disabled:opacity-50"
+            disabled={!inputText.trim()}
+            title="Send message"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
             </svg>
           </button>
-          
-          <div className="relative flex-1">
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="Send message or upload file..."
-              className={`w-full rounded-xl py-2.5 px-3.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all pr-10 border ${
-                isDark ? 'bg-[#161b22] border-gray-700 text-white placeholder:text-gray-500' : 'bg-slate-100 border-slate-300 text-slate-800 placeholder:text-slate-400'
-              }`}
-            />
-            <button 
-              type="submit"
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-indigo-500 hover:text-indigo-400 transition-colors disabled:opacity-50"
-              disabled={!inputText.trim()}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </button>
-          </div>
         </div>
       </form>
     </div>
