@@ -44,45 +44,7 @@ const PISTON_LANG_MAP: Record<string, { lang: string; version: string }> = {
   sql: { lang: 'sqlite3', version: '3.36.0' },
 };
 
-// ── Runtime Instrumentation (remove after diagnosis) ────────────────────────
-let __editorRenderCount = 0;
-let __editorMountCount = 0;
-let __editorInstanceCounter = 0;
-let __modelInstanceCounter = 0;
-let __recursiveCheck = 0;
-
-// Log history buffer for state transition printout
-const __logHistory: Array<{ tag: string; ts: string; data: any; stack?: string }> = [];
-(window as any).__goatLogHistory = __logHistory;
-
-const __log = (tag: string, data: Record<string, unknown>, includeStack = false) => {
-  const ts = performance.now().toFixed(1) + 'ms';
-  const stack = includeStack ? new Error().stack : undefined;
-  const entry = { tag, ts, data, stack };
-  __logHistory.push(entry);
-  if (__logHistory.length > 100) __logHistory.shift();
-
-  console.log(`%c[GOAT][${tag}]`, 'color:#4ec9b0;font-weight:bold', { ts, ...data });
-  if (includeStack) {
-    console.trace(`[GOAT][${tag}] stack trace`);
-  }
-};
-
-const triggerStateTransition = (reason: string, details: any) => {
-  console.error(`%c[GOAT][STATE TRANSITION DETECTED] %c${reason}`, 'color:#ff5f56;font-weight:bold;font-size:14px;', 'color:#fff;font-weight:bold;background:#ff5f56;padding:2px 6px;border-radius:3px;', details);
-  console.log('%cLast 20 events prior to transition:', 'color:#ffbd2e;font-weight:bold;');
-  __logHistory.slice(-20).forEach((entry, idx) => {
-    console.log(`${idx + 1}. [${entry.ts}] [${entry.tag}]`, entry.data);
-    if (entry.stack) {
-      console.log('   Stack:', entry.stack);
-    }
-  });
-};
-// ─────────────────────────────────────────────────────────────────────────────
-
 const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
-  __editorRenderCount++;
-  __log('RENDER', { count: __editorRenderCount, reason: 'EditorPage re-rendered' });
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<User | null>(propUser);
@@ -170,13 +132,6 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
   useEffect(() => {
     activeUsersRef.current = activeUsers;
   }, [activeUsers]);
-
-  useEffect(() => {
-    __log('LIFECYCLE_MOUNT', { msg: 'EditorPage mounted' });
-    return () => {
-      __log('LIFECYCLE_UNMOUNT', { msg: 'EditorPage unmounted' });
-    };
-  }, []);
 
   useEffect(() => {
     const styleId = 'monaco-cursor-styles';
@@ -301,41 +256,19 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
     if (model.getValue() === newCode) return;
 
     const posBefore = editorRef.current.getPosition();
-    const vBefore = model.getAlternativeVersionId();
-    __log('EXECUTE_EDITS', {
-      caller: 'applyCodeToEditor',
-      posBefore: posBefore ? `L${posBefore.lineNumber}:C${posBefore.column}` : null,
-      vBefore,
-      textLen: newCode.length,
-    });
-
     remoteChangeDepth.current++;
-    // forceMoveMarkers:true lets Monaco track the cursor through the replacement
-    // so we never hold a stale column reference from the old document.
     editorRef.current.executeEdits('remote-sync', [
       { range: model.getFullModelRange(), text: newCode, forceMoveMarkers: true }
     ]);
     remoteChangeDepth.current--;
 
-    // Clamp the saved position to the bounds of the NEW document and restore.
-    // Do NOT use the raw posBefore directly — the new text may be shorter.
     if (posBefore) {
       const newLineCount = model.getLineCount();
       const restoredLine = Math.min(posBefore.lineNumber, newLineCount);
       const restoredCol = Math.min(posBefore.column, model.getLineMaxColumn(restoredLine));
       editorRef.current.setPosition({ lineNumber: restoredLine, column: restoredCol });
     }
-
-    const posAfter = editorRef.current.getPosition();
-    __log('EXECUTE_EDITS_DONE', {
-      caller: 'applyCodeToEditor',
-      posAfter: posAfter ? `L${posAfter.lineNumber}:C${posAfter.column}` : null,
-      vAfter: model.getAlternativeVersionId(),
-      cursorMoved: JSON.stringify(posBefore) !== JSON.stringify(posAfter),
-    });
   }, []);
-
-  (window as any).__goatApplyCode = applyCodeToEditor;
 
   useEffect(() => {
     let username = currentUser?.username;
@@ -366,27 +299,6 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
     });
 
     socketRef.current = socket;
-
-    // Instrument socket emit/receive
-    const origEmit = socket.emit.bind(socket);
-    socket.emit = (event: string, ...args: any[]) => {
-      __log('SOCKET_SEND', {
-        event,
-        payload: args[0],
-      });
-      return origEmit(event, ...args);
-    };
-
-    const origOn = socket.on.bind(socket);
-    socket.on = (event: string, fn: (...args: any[]) => void) => {
-      return origOn(event, (...args: any[]) => {
-        __log('SOCKET_RECEIVE', {
-          event,
-          payload: args[0],
-        });
-        return fn(...args);
-      });
-    };
 
     socket.on('connect', () => {
       setIsOffline(false);
@@ -440,9 +352,6 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
       const user = activeUsersRef.current.find(u => u.id === socketId);
       if (user) {
         remoteCursors.current.set(socketId, { position, selection, username: user.username, color: user.color, lastSeen: Date.now() });
-        // DO NOT call setActiveUsers here — it triggers a full React re-render
-        // on every remote cursor move, which causes MonacoEditor to see new props
-        // and interferes with the local cursor. Decorations are enough.
         updateDecorations();
       }
     });
@@ -464,277 +373,19 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
 
-    const editorId = ++__editorInstanceCounter;
-    __editorMountCount++;
-    (window as any).__goatAliveEditors = ((window as any).__goatAliveEditors || 0) + 1;
-
-    __log('MONACO_MOUNT', {
-      msg: 'Monaco Editor onMount called',
-      editorId,
-      aliveCount: (window as any).__goatAliveEditors,
-      mountCount: __editorMountCount
-    }, true);
-
-    console.log("Resolved insertSpaces value in Monaco:", editor.getOptions().get(monaco.editor.EditorOption.insertSpaces));
-
-    // Instrument updateOptions
-    const origUpdateOptions = editor.updateOptions.bind(editor);
-    editor.updateOptions = (newOpts: any) => {
-      const prevOpts = {
-        cursorStyle: editor.getOption(monaco.editor.EditorOption.cursorStyle),
-        readOnly: editor.getOption(monaco.editor.EditorOption.readOnly),
-      };
-      __log('UPDATE_OPTIONS_CALL', { editorId, prevOpts, newOpts }, true);
-      const res = origUpdateOptions(newOpts);
-      const postOpts = {
-        cursorStyle: editor.getOption(monaco.editor.EditorOption.cursorStyle),
-        readOnly: editor.getOption(monaco.editor.EditorOption.readOnly),
-      };
-      __log('UPDATE_OPTIONS_DONE', { editorId, postOpts });
-      return res;
-    };
-
-    // Instrument executeEdits
-    const origExecuteEdits = editor.executeEdits.bind(editor);
-    editor.executeEdits = (source: string, edits: any[], endCursorState?: any) => {
-      const posBefore = editor.getPosition();
-      const selBefore = editor.getSelection();
-      const model = editor.getModel();
-      const uri = model?.uri.toString();
-      const versionBefore = model?.getAlternativeVersionId();
-
-      __log('EXECUTE_EDITS_CALL', {
-        editorId,
-        modelId: (model as any)?.__goatModelId,
-        uri,
-        modelVerBefore: versionBefore,
-        source,
-        editsCount: edits?.length,
-        posBefore: posBefore ? `L${posBefore.lineNumber}:C${posBefore.column}` : null,
-        selBefore: selBefore ? `L${selBefore.startLineNumber}:C${selBefore.startColumn}→L${selBefore.endLineNumber}:C${selBefore.endColumn}` : null,
-        edits: edits?.map((e: any) => ({
-          range: `L${e.range.startLineNumber}:C${e.range.startColumn}→L${e.range.endLineNumber}:C${e.range.endColumn}`,
-          textLength: e.text?.length,
-          forceMoveMarkers: e.forceMoveMarkers,
-        }))
-      }, true); // include stack trace
-
-      __recursiveCheck++;
-      const res = origExecuteEdits(source, edits, endCursorState);
-      __recursiveCheck--;
-
-      const posAfter = editor.getPosition();
-      const selAfter = editor.getSelection();
-      __log('EXECUTE_EDITS_DONE', {
-        editorId,
-        modelVerAfter: model?.getAlternativeVersionId(),
-        posAfter: posAfter ? `L${posAfter.lineNumber}:C${posAfter.column}` : null,
-        selAfter: selAfter ? `L${selAfter.startLineNumber}:C${selAfter.startColumn}→L${selAfter.endLineNumber}:C${selAfter.endColumn}` : null,
-      });
-
-      return res;
-    };
-
-    // Instrument setModel
-    const origSetModel = editor.setModel.bind(editor);
-    editor.setModel = (newModel: any) => {
-      const prevModel = editor.getModel();
-      __log('SET_MODEL_CALL', {
-        editorId,
-        prevModelUri: prevModel?.uri.toString(),
-        newModelUri: newModel?.uri.toString(),
-        newModelId: newModel?.__goatModelId,
-      }, true);
-      
-      if (newModel) {
-        newModel.updateOptions({
-          insertSpaces: false,
-          tabSize: 4,
-        });
-
-        // If new model is not wrapped, wrap its setValue
-        if (!newModel.__goatModelId) {
-          const modelId = ++__modelInstanceCounter;
-          newModel.__goatModelId = modelId;
-          const origSetValue = newModel.setValue.bind(newModel);
-          newModel.setValue = (value: string) => {
-            __log('MODEL_SET_VALUE_CALL', {
-              modelId,
-              uri: newModel.uri.toString(),
-              oldLength: newModel.getValue().length,
-              newLength: value.length,
-            }, true);
-            return origSetValue(value);
-          };
-        }
-      }
-      return origSetModel(newModel);
-    };
-
-    // Instrument dispose
-    const origDispose = editor.dispose.bind(editor);
-    editor.dispose = () => {
-      (window as any).__goatAliveEditors = Math.max(0, ((window as any).__goatAliveEditors || 0) - 1);
-      __log('DISPOSE_CALL', {
-        editorId,
-        aliveCount: (window as any).__goatAliveEditors,
-      }, true);
-      return origDispose();
-    };
-
-    // Listen to all keydown/keyup events
-    editor.onKeyDown((e: any) => {
-      console.log("Key pressed in Monaco:", e.browserEvent.key);
-      __log('KEY_DOWN_EVENT', {
-        editorId,
-        key: e.browserEvent.key,
-        code: e.browserEvent.code,
-        keyCode: e.keyCode,
-        shift: e.shiftKey,
-        ctrl: e.ctrlKey,
-        alt: e.altKey,
-        meta: e.metaKey,
-      });
-    });
-
-    editor.onKeyUp((e: any) => {
-      __log('KEY_UP_EVENT', {
-        editorId,
-        key: e.browserEvent.key,
-        code: e.browserEvent.code,
-        keyCode: e.keyCode,
-      });
-    });
-
-    let prevCursorStyle = editor.getOption(monaco.editor.EditorOption.cursorStyle);
-    editor.onDidChangeConfiguration((e: any) => {
-      const newCursorStyle = editor.getOption(monaco.editor.EditorOption.cursorStyle);
-      const readOnly = editor.getOption(monaco.editor.EditorOption.readOnly);
-      __log('CONFIGURATION_CHANGED', {
-        editorId,
-        cursorStyle: newCursorStyle,
-        readOnly,
-      });
-      if (newCursorStyle !== prevCursorStyle) {
-        const oldStyle = prevCursorStyle;
-        prevCursorStyle = newCursorStyle;
-        if (newCursorStyle !== 1) { // 1 is Line cursor style
-          triggerStateTransition('BLOCK_CURSOR_DETECTED', {
-            editorId,
-            oldStyle,
-            newStyle: newCursorStyle,
-          });
-        }
-      }
-    });
-
-    editor.onDidChangeCursorPosition((e: any) => {
-      __log('CURSOR_POSITION_CHANGED', {
-        editorId,
-        reason: e.reason,
-        position: `L${e.position.lineNumber}:C${e.position.column}`,
-        source: e.source,
-      });
-    });
-
-    editor.onDidChangeCursorSelection((e: any) => {
-      __log('CURSOR_SELECTION_CHANGED', {
-        editorId,
-        selection: `L${e.selection.startLineNumber}:C${e.selection.startColumn}→L${e.selection.endLineNumber}:C${e.selection.endColumn}`,
-        source: e.source,
-      });
-    });
-
-    // Wrap initial model
     const initialModel = editor.getModel();
     if (initialModel) {
-      console.log("Initial Monaco model options:", {
-        insertSpaces: initialModel.getOptions().insertSpaces,
-        tabSize: initialModel.getOptions().tabSize,
-        indentSize: initialModel.getOptions().indentSize,
-      });
-
-      // Force tab configuration on model level to prevent it from overriding editor options
       initialModel.updateOptions({
         insertSpaces: false,
         tabSize: 4,
       });
-
-      console.log("Forced Monaco model options:", {
-        insertSpaces: initialModel.getOptions().insertSpaces,
-        tabSize: initialModel.getOptions().tabSize,
-        indentSize: initialModel.getOptions().indentSize,
-      });
-
-      if (!initialModel.__goatModelId) {
-        const modelId = ++__modelInstanceCounter;
-        initialModel.__goatModelId = modelId;
-        const origSetValue = initialModel.setValue.bind(initialModel);
-        initialModel.setValue = (value: string) => {
-          __log('MODEL_SET_VALUE_CALL', {
-            modelId,
-            uri: initialModel.uri.toString(),
-            oldLength: initialModel.getValue().length,
-            newLength: value.length,
-          }, true);
-          return origSetValue(value);
-        };
-
-      initialModel.onDidChangeContent((e: any) => {
-        if (remoteChangeDepth.current > 0) return; // skip remote changes
-        
-        // Loop recursion detection
-        if (__recursiveCheck > 0) {
-          __log('RECURSIVE_UPDATE_DETECTED', {
-            editorId,
-            modelId: initialModel.__goatModelId,
-            recursionDepth: __recursiveCheck,
-            source: e.isFlush ? 'flush' : 'edit'
-          });
-        }
-
-        // Overwrite mode detection: local change replacing characters when no selection was active
-        const sel = editor.getSelection();
-        const selectionIsEmpty = sel ? sel.isEmpty() : true;
-        const change = e.changes?.[0];
-        if (change && selectionIsEmpty && change.rangeLength > 0) {
-          triggerStateTransition('OVERWRITE_MODE_TYPING_DETECTED', {
-            editorId,
-            modelId: initialModel.__goatModelId,
-            changeText: JSON.stringify(change.text),
-            rangeLength: change.rangeLength,
-            cursor: editor.getPosition(),
-          });
-        }
-
-        __log('MODEL_CHANGE_LOCAL', {
-          editorId,
-          modelId: initialModel.__goatModelId,
-          changes: e.changes?.length,
-          // KEY DIAGNOSTIC: if rangeLength > 0 with no selection it means Monaco
-          // is replacing (not just inserting) — that IS the overwrite symptom.
-          firstChangeRangeLength: e.changes?.[0]?.rangeLength,
-          firstChangeText: JSON.stringify(e.changes?.[0]?.text),
-          firstChangeRange: e.changes?.[0]
-            ? `L${e.changes[0].range.startLineNumber}:C${e.changes[0].range.startColumn}`
-            + `→L${e.changes[0].range.endLineNumber}:C${e.changes[0].range.endColumn}`
-            : null,
-          versionId: initialModel.getAlternativeVersionId(),
-          pos: editor.getPosition(),
-        });
-      });
     }
-  }
 
     const initialCode = syncedCodeRef.current !== null ? syncedCodeRef.current : (DEFAULT_CODE[language] || '');
     if (editor.getValue() !== initialCode) {
       const model = editor.getModel();
       remoteChangeDepth.current++;
       if (model) {
-        // forceMoveMarkers:true — Monaco tracks cursor through the replacement.
-        // After init we explicitly reset to L1:C1 so the cursor starts at a
-        // guaranteed-valid position in the new document (not wherever executeEdits
-        // happened to leave it, which could be the end of the old empty buffer).
         editor.executeEdits('init', [{ range: model.getFullModelRange(), text: initialCode, forceMoveMarkers: true }]);
         editor.setPosition({ lineNumber: 1, column: 1 });
       } else {
@@ -746,8 +397,6 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
     } else {
       codeValueRef.current = editor.getValue();
     }
-
-
 
     editor.onDidChangeCursorSelection((e: any) => {
       if (remoteChangeDepth.current > 0) return;
@@ -768,30 +417,16 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
         });
       }
     });
+
     document.fonts.ready.then(() => {
       try {
-        // remeasureFonts() forces Monaco to recalculate character widths
-        // using the NOW-ACTIVE web font (Fira Code at 8.4px).
-        // Without this, Monaco keeps its initial measurement made during mount
-        // when only the fallback system font (Consolas at 7.7px) was active.
-        // That 0.7px/char difference causes click-to-column mapping to drift
-        // by ~4 columns over 40 chars, making typed characters insert at the
-        // wrong position (the 'Deveploper' bug).
-        if (monacoRef.current) {
-          monacoRef.current.editor.remeasureFonts();
-        }
-        if (editorRef.current) {
-          editorRef.current.layout();
-        }
+        if (monacoRef.current) monacoRef.current.editor.remeasureFonts();
+        if (editorRef.current) editorRef.current.layout();
       } catch (e) {
-        console.warn('Failed to remeasure monaco fonts on fonts ready:', e);
+        // ignore
       }
     });
 
-    // CURSOR-SYNC FIX: remeasure on first focus too.
-    // document.fonts.ready can fire slightly before the browser fully activates
-    // the web font for Monaco's specific size/weight. The first focus guarantees
-    // Fira Code is 100% active and remeasureFonts() will produce the correct widths.
     let remeasuredOnFocus = false;
     const focusDisposable = editor.onDidFocusEditorText(() => {
       if (remeasuredOnFocus) return;
@@ -807,16 +442,9 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
 
   const handleCodeChange = useCallback((value: string | undefined) => {
     if (value === undefined) return;
-    if (remoteChangeDepth.current > 0) {
-      __log('CODE_CHANGE_SKIP', { reason: 'remoteChangeDepth > 0', depth: remoteChangeDepth.current });
-      return;
-    }
-    if (value === codeValueRef.current) {
-      __log('CODE_CHANGE_SKIP', { reason: 'value unchanged' });
-      return;
-    }
+    if (remoteChangeDepth.current > 0) return;
+    if (value === codeValueRef.current) return;
 
-    __log('CODE_CHANGE_EMIT', { len: value.length, delta: value.length - codeValueRef.current.length });
     codeValueRef.current = value;
     syncedCodeRef.current = value;
 

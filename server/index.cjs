@@ -282,46 +282,7 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('receive-message', message);
   });
 
-  // --- WebRTC Voice Call Signaling ---
-  socket.on('voice-join', ({ roomId, user }) => {
-    if (!voiceRooms.has(roomId)) {
-      voiceRooms.set(roomId, new Map());
-    }
-    const roomVoice = voiceRooms.get(roomId);
-
-    // Send existing voice participants to the newcomer (exclude self)
-    const existingPeers = Array.from(roomVoice.entries())
-      .filter(([peerSocketId]) => peerSocketId !== socket.id)
-      .map(([peerSocketId, data]) => ({
-        socketId: peerSocketId,
-        user: data.user,
-        isMuted: data.isMuted,
-        isDeafened: data.isDeafened
-      }));
-    socket.emit('voice-all-peers', existingPeers);
-
-    // Register user in voice roster
-    roomVoice.set(socket.id, { user, isMuted: false, isDeafened: false, roomId });
-
-    // Announce to other peers in the room
-    socket.to(roomId).emit('voice-peer-joined', {
-      socketId: socket.id,
-      user,
-      isMuted: false,
-      isDeafened: false
-    });
-
-    // Broadcast updated roster to entire room for UI badges
-    io.in(roomId).emit('voice-roster-update', Array.from(roomVoice.values()).map(v => ({
-      socketId: socket.id,
-      user: v.user,
-      isMuted: v.isMuted,
-      isDeafened: v.isDeafened
-    })));
-    console.log(`🎙️ Voice join: ${user?.username || socket.id} in room ${roomId}`);
-  });
-
-  // --- Direct 1-to-1 Voice Call Signaling ---
+  // --- Direct 1-to-1 WebRTC Voice Call Signaling ---
   socket.on('direct-call-initiate', ({ toSocketId, caller }) => {
     if (!toSocketId || toSocketId === socket.id) return;
     io.to(toSocketId).emit('direct-call-incoming', {
