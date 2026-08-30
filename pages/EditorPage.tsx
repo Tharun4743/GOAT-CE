@@ -347,8 +347,10 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
         color = COLORS[Math.floor(Math.random() * COLORS.length)];
         setCurrentUser({ id: Math.random().toString(36).substr(2, 9), username, color });
       } else {
-        navigate('/');
-        return;
+        username = `Dev-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        color = COLORS[Math.floor(Math.random() * COLORS.length)];
+        sessionStorage.setItem('goat_username', username);
+        setCurrentUser({ id: Math.random().toString(36).substr(2, 9), username, color });
       }
     }
 
@@ -359,9 +361,10 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
 
     const socket = io(socketUrl, {
       reconnection: true,
-      reconnectionAttempts: 5,
-      timeout: 10000,
-      transports: ['websocket']
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      timeout: 15000,
+      transports: ['websocket', 'polling']
     });
 
     socketRef.current = socket;

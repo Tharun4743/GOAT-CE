@@ -16,8 +16,9 @@ const io = new Server(server, {
     methods: ['GET', 'POST'],
     credentials: true
   },
-  pingTimeout: 10000,
-  pingInterval: 25000
+  pingTimeout: 20000,
+  pingInterval: 25000,
+  transports: ['websocket', 'polling']
 });
 
 app.use(cors());

@@ -36,8 +36,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onJoin }) => {
     if (!username.trim()) return alert('Please enter a username');
     const cleanRoomId = roomId.trim().toUpperCase();
     if (!cleanRoomId) return alert('Please enter a Room ID');
-    if (cleanRoomId.length < 4 || cleanRoomId.length > 6) {
-      return alert('Room ID must be between 4 and 6 characters long');
+    if (cleanRoomId.length < 2 || cleanRoomId.length > 20) {
+      return alert('Room ID must be between 2 and 20 characters long');
     }
     setIsLoading(true);
     setTimeout(() => {
