@@ -56,7 +56,7 @@ const ActiveCallBar: React.FC<ActiveCallBarProps> = ({
           {/* Local User Avatar */}
           {currentUser && (
             <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black text-white shadow-md relative ring-2 ring-[#12161f] z-10"
+              className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black text-white shadow-md relative ring-2 ${isDark ? 'ring-[#12161f]' : 'ring-white'} z-10`}
               style={{ backgroundColor: currentUser.color || '#6366f1' }}
               title={`${currentUser.username} (You)`}
             >
@@ -71,7 +71,7 @@ const ActiveCallBar: React.FC<ActiveCallBarProps> = ({
           {voicePeers.map((peer, idx) => (
             <div
               key={peer.socketId}
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black text-white shadow-md relative ring-2 ring-[#12161f]"
+              className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black text-white shadow-md relative ring-2 ${isDark ? 'ring-[#12161f]' : 'ring-white'}`}
               style={{
                 backgroundColor: peer.user?.color || '#3b82f6',
                 zIndex: 9 - idx
@@ -88,7 +88,7 @@ const ActiveCallBar: React.FC<ActiveCallBarProps> = ({
           {/* Single Peer Fallback if voicePeers empty but calling */}
           {voicePeers.length === 0 && activePeer && (
             <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black text-white shadow-md relative ring-2 ring-[#12161f]"
+              className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black text-white shadow-md relative ring-2 ${isDark ? 'ring-[#12161f]' : 'ring-white'}`}
               style={{ backgroundColor: activePeer.user?.color || '#3b82f6' }}
               title={activePeer.user?.username}
             >

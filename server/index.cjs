@@ -77,37 +77,89 @@ if (DATABASE_URL) {
 }
 
 // --- Cloudinary & Multer Setup ---
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
+
+const cleanCloudName = (process.env.CLOUDINARY_CLOUD_NAME || '').trim().replace(/^['"]|['"]$/g, '');
+const cleanApiKey = (process.env.CLOUDINARY_API_KEY || '').trim().replace(/^['"]|['"]$/g, '');
+const cleanApiSecret = (process.env.CLOUDINARY_API_SECRET || '').trim().replace(/^['"]|['"]$/g, '');
+
+if (cleanCloudName && cleanApiKey && cleanApiSecret) {
+  cloudinary.config({
+    cloud_name: cleanCloudName,
+    api_key: cleanApiKey,
+    api_secret: cleanApiSecret
+  });
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  limits: { fileSize: 25 * 1024 * 1024 } // 25MB limit
 });
 
-// Upload Endpoint for Images/Files
+// Upload Endpoint for Images & Files (with automatic local fallback)
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
-    if (req.file) {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        { folder: 'goat_editor' },
-        (error, result) => {
-          if (error) {
-            console.error('Cloudinary stream upload error:', error);
-            return res.status(500).json({ error: error.message || 'Upload failed' });
-          }
-          return res.json({ success: true, url: result.secure_url, public_id: result.public_id });
-        }
-      );
-      uploadStream.end(req.file.buffer);
-    } else if (req.body && req.body.image) {
-      const result = await cloudinary.uploader.upload(req.body.image, { folder: 'goat_editor' });
-      return res.json({ success: true, url: result.secure_url, public_id: result.public_id });
-    } else {
+    if (!req.file && (!req.body || !req.body.image)) {
       return res.status(400).json({ error: 'No file or image payload provided' });
+    }
+
+    // Helper to save file locally
+    const saveLocally = () => {
+      const fileBuffer = req.file
+        ? req.file.buffer
+        : Buffer.from(req.body.image.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      const originalName = req.file?.originalname || 'upload.png';
+      const ext = path.extname(originalName) || '.png';
+      const filename = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}${ext}`;
+      const filePath = path.join(uploadsDir, filename);
+      fs.writeFileSync(filePath, fileBuffer);
+      return { url: `/uploads/${filename}`, filename: originalName };
+    };
+
+    // If Cloudinary credentials are fully configured, attempt Cloudinary upload
+    if (cleanCloudName && cleanApiKey && cleanApiSecret) {
+      if (req.file) {
+        try {
+          const result = await new Promise((resolve, reject) => {
+            const uploadStream = cloudinary.uploader.upload_stream(
+              {
+                folder: 'goat_editor',
+                resource_type: 'auto'
+              },
+              (error, responseResult) => {
+                if (error) reject(error);
+                else resolve(responseResult);
+              }
+            );
+            uploadStream.end(req.file.buffer);
+          });
+          return res.json({ success: true, url: result.secure_url, public_id: result.public_id });
+        } catch (cloudErr) {
+          console.warn('⚠️ Cloudinary stream upload failed, saving locally:', cloudErr.message);
+          const localResult = saveLocally();
+          return res.json({ success: true, url: localResult.url });
+        }
+      } else if (req.body && req.body.image) {
+        try {
+          const result = await cloudinary.uploader.upload(req.body.image, {
+            folder: 'goat_editor',
+            resource_type: 'auto'
+          });
+          return res.json({ success: true, url: result.secure_url, public_id: result.public_id });
+        } catch (cloudErr) {
+          console.warn('⚠️ Cloudinary upload failed, saving locally:', cloudErr.message);
+          const localResult = saveLocally();
+          return res.json({ success: true, url: localResult.url });
+        }
+      }
+    } else {
+      // Cloudinary not configured, store locally
+      const localResult = saveLocally();
+      return res.json({ success: true, url: localResult.url });
     }
   } catch (err) {
     console.error('Upload Endpoint Error:', err);

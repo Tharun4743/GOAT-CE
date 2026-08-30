@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage, User } from '../types';
-import ActiveCallBar from './ActiveCallBar';
 import { UseVoiceCallReturn } from '../hooks/useVoiceCall';
 
 interface ChatBoxProps {
@@ -47,7 +46,12 @@ const ChatBox: React.FC<ChatBoxProps> = ({ messages, onSendMessage, theme = 'dar
 
       const data = await response.json();
       if (data.success && data.url) {
-        onSendMessage(`🖼️ Image uploaded: ${data.url}`);
+        const isImg = file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg)$/i.test(file.name);
+        if (isImg) {
+          onSendMessage(`🖼️ Image: ${data.url}`);
+        } else {
+          onSendMessage(`📎 Attachment (${file.name}): ${data.url}`);
+        }
       } else {
         alert(`Upload failed: ${data.error || 'Unknown error'}`);
       }
@@ -61,10 +65,11 @@ const ChatBox: React.FC<ChatBoxProps> = ({ messages, onSendMessage, theme = 'dar
   };
 
   const renderMessageContent = (text: string) => {
-    const imageUrlMatch = text.match(/(https?:\/\/[^\s]+?\.(?:png|jpg|jpeg|gif|webp|svg)|https?:\/\/res\.cloudinary\.com\/[^\s]+)/i);
+    // 1. Image match (Cloudinary, web URL, or local /uploads/)
+    const imageUrlMatch = text.match(/(https?:\/\/[^\s]+?\.(?:png|jpg|jpeg|gif|webp|svg)|https?:\/\/res\.cloudinary\.com\/[^\s]+|\/uploads\/[^\s]+?\.(?:png|jpg|jpeg|gif|webp|svg))/i);
     if (imageUrlMatch) {
       const imageUrl = imageUrlMatch[0];
-      const cleanText = text.replace(imageUrl, '').trim();
+      const cleanText = text.replace(imageUrl, '').replace(/^(🖼️ Image:\s*|🖼️ Image uploaded:\s*)/, '').trim();
       return (
         <div className="space-y-2">
           {cleanText && <div>{cleanText}</div>}
@@ -76,6 +81,38 @@ const ChatBox: React.FC<ChatBoxProps> = ({ messages, onSendMessage, theme = 'dar
         </div>
       );
     }
+
+    // 2. Generic File Attachment match (pdf, doc, zip, etc.)
+    const fileUrlMatch = text.match(/(https?:\/\/[^\s]+|\/uploads\/[^\s]+)/i);
+    if (fileUrlMatch && (text.includes('Attachment') || text.includes('/uploads/'))) {
+      const fileUrl = fileUrlMatch[0];
+      const cleanText = text.replace(fileUrl, '').replace(/^📎 Attachment\s*(\([^)]+\))?:\s*/, '').trim();
+      const fileName = fileUrl.split('/').pop() || 'Download Attachment';
+      return (
+        <div className="space-y-2">
+          {cleanText && <div>{cleanText}</div>}
+          <a
+            href={fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            download
+            className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-bold transition-all max-w-xs ${
+              isDark
+                ? 'bg-gray-800/80 border-gray-700 text-indigo-400 hover:bg-gray-700 hover:text-indigo-300'
+                : 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
+            }`}
+          >
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-100 text-indigo-600'}`}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <span className="truncate flex-1">{fileName}</span>
+          </a>
+        </div>
+      );
+    }
+
     return <div>{text}</div>;
   };
 
@@ -99,25 +136,6 @@ const ChatBox: React.FC<ChatBoxProps> = ({ messages, onSendMessage, theme = 'dar
         )}
       </div>
 
-      {voiceCall && voiceCall.callStatus !== 'idle' && (
-        <div className="mb-3">
-          <ActiveCallBar
-            callStatus={voiceCall.callStatus}
-            voicePeers={voiceCall.voicePeers}
-            activePeer={voiceCall.activePeer}
-            currentUser={currentUser}
-            isMuted={voiceCall.isMuted}
-            isDeafened={voiceCall.isDeafened}
-            localIsSpeaking={voiceCall.localIsSpeaking}
-            peerIsSpeaking={voiceCall.peerIsSpeaking}
-            callDuration={voiceCall.callDuration}
-            onToggleMute={voiceCall.toggleMute}
-            onToggleDeafen={voiceCall.toggleDeafen}
-            onEndCall={voiceCall.endActiveCall}
-            theme={theme}
-          />
-        </div>
-      )}
       
       <div 
         ref={scrollRef}
