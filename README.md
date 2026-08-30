@@ -21,13 +21,7 @@
 [![Express](https://img.shields.io/badge/Express-5.2-000000?style=flat-square&logo=express&logoColor=white)](https://expressjs.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-F59E0B?style=flat-square)](./LICENSE)
 
----
-
-### 🏆 **National Hackathon Winner — Code Thugs 2k26 (1st Place)** 🥇
-
 </div>
-
-> **GOAT Code Editor** was engineered and recognized as the **1st Place National Winner** at **Code Thugs 2k26**, standing out for its zero-latency real-time collaboration engine, sub-pixel Monaco editor calibration, integrated 1-to-1 WebRTC voice calling mesh, and ephemeral auto-purging room lifecycle.
 
 ---
 
