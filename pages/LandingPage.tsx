@@ -200,13 +200,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onJoin }) => {
               </button>
             </div>
           </form>
-
-          {/* Footer */}
-          <div className="flex flex-col items-center gap-1.5 pt-2 border-t border-indigo-100/60">
-            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-[0.35em]">
-              By <a href="https://tharunkumark4743.netlify.app/" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-600 hover:underline transition-colors">Tharunkumar</a> &amp; Pratap — Team GOAT
-            </p>
-          </div>
         </div>
       </div>
 
