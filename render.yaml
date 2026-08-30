@@ -3,6 +3,8 @@ services:
     name: goatcode-editor
     runtime: node
     plan: free
+    autoDeploy: true
+    healthCheckPath: /
     buildCommand: npm install && npm run build
     startCommand: node server/index.cjs
     envVars:
@@ -20,4 +22,3 @@ services:
         sync: false
       - key: OPENROUTER_API_KEY
         sync: false
-

@@ -161,6 +161,7 @@ async function getOrCreateRoom(roomId, username) {
 }
 
 const userMap = new Map(); // socketId -> { username, roomId, color, id }
+const voiceRooms = new Map(); // roomId -> Map<socketId, { user, isMuted, isDeafened, roomId }>
 
 io.on('connection', (socket) => {
   console.log('📡 Node joined:', socket.id);
@@ -262,14 +263,171 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('receive-message', message);
   });
 
-  socket.on('disconnecting', () => {
-    const userData = userMap.get(socket.id);
-    if (userData) {
-      const rooms = Array.from(socket.rooms);
-      rooms.forEach(roomId => {
-        socket.to(roomId).emit('user-left', { socketId: socket.id });
+  // --- WebRTC Voice Call Signaling ---
+  socket.on('voice-join', ({ roomId, user }) => {
+    if (!voiceRooms.has(roomId)) {
+      voiceRooms.set(roomId, new Map());
+    }
+    const roomVoice = voiceRooms.get(roomId);
+
+    // Send existing voice participants to the newcomer (exclude self)
+    const existingPeers = Array.from(roomVoice.entries())
+      .filter(([peerSocketId]) => peerSocketId !== socket.id)
+      .map(([peerSocketId, data]) => ({
+        socketId: peerSocketId,
+        user: data.user,
+        isMuted: data.isMuted,
+        isDeafened: data.isDeafened
+      }));
+    socket.emit('voice-all-peers', existingPeers);
+
+    // Register user in voice roster
+    roomVoice.set(socket.id, { user, isMuted: false, isDeafened: false, roomId });
+
+    // Announce to other peers in the room
+    socket.to(roomId).emit('voice-peer-joined', {
+      socketId: socket.id,
+      user,
+      isMuted: false,
+      isDeafened: false
+    });
+
+    // Broadcast updated roster to entire room for UI badges
+    io.in(roomId).emit('voice-roster-update', Array.from(roomVoice.values()).map(v => ({
+      socketId: socket.id,
+      user: v.user,
+      isMuted: v.isMuted,
+      isDeafened: v.isDeafened
+    })));
+    console.log(`🎙️ Voice join: ${user?.username || socket.id} in room ${roomId}`);
+  });
+
+  // --- Direct 1-to-1 Voice Call Signaling ---
+  socket.on('direct-call-initiate', ({ toSocketId, caller }) => {
+    if (!toSocketId || toSocketId === socket.id) return;
+    io.to(toSocketId).emit('direct-call-incoming', {
+      fromSocketId: socket.id,
+      caller
+    });
+    console.log(`📞 Call initiated from ${caller?.username || socket.id} to ${toSocketId}`);
+  });
+
+  socket.on('direct-call-accept', ({ toSocketId }) => {
+    if (!toSocketId) return;
+    io.to(toSocketId).emit('direct-call-accepted', {
+      fromSocketId: socket.id
+    });
+    console.log(`✅ Call accepted by ${socket.id} from ${toSocketId}`);
+  });
+
+  socket.on('direct-call-reject', ({ toSocketId }) => {
+    if (!toSocketId) return;
+    io.to(toSocketId).emit('direct-call-rejected', {
+      fromSocketId: socket.id
+    });
+    console.log(`❌ Call rejected by ${socket.id} for ${toSocketId}`);
+  });
+
+  socket.on('direct-call-end', ({ toSocketId }) => {
+    if (!toSocketId) return;
+    io.to(toSocketId).emit('direct-call-ended', {
+      fromSocketId: socket.id
+    });
+    console.log(`📴 Call ended between ${socket.id} and ${toSocketId}`);
+  });
+
+  socket.on('voice-signal', ({ to, signal }) => {
+    if (!to || to === socket.id) return;
+    // Relay WebRTC offer / answer / ICE candidate directly between peers
+    io.to(to).emit('voice-signal', {
+      from: socket.id,
+      signal
+    });
+  });
+
+  socket.on('voice-status-update', ({ toSocketId, isMuted }) => {
+    if (toSocketId) {
+      io.to(toSocketId).emit('voice-peer-status', {
+        socketId: socket.id,
+        isMuted
       });
+    }
+  });
+
+// Purge all data associated with a room when all users have left
+async function purgeRoomIfEmpty(roomId) {
+  if (!roomId) return;
+  // Count active users in this room (excluding disconnected sockets)
+  const activeMembers = Array.from(userMap.values()).filter(u => u.roomId === roomId);
+  if (activeMembers.length === 0) {
+    // 1. Purge in-memory editor data & snapshots
+    if (inMemoryRooms.has(roomId)) {
+      inMemoryRooms.delete(roomId);
+    }
+    // 2. Purge voice room & active voice peers
+    if (voiceRooms.has(roomId)) {
+      voiceRooms.delete(roomId);
+    }
+    // 3. Purge database room records & snapshots if PostgreSQL is connected
+    if (isPgConnected && pool) {
+      try {
+        await pool.query('DELETE FROM snapshots WHERE room_id = $1', [roomId]);
+        await pool.query('DELETE FROM rooms WHERE room_id = $1', [roomId]);
+      } catch (err) {
+        console.warn(`Database purge warning for room ${roomId}:`, err.message);
+      }
+    }
+    console.log(`🧹 [AUTO-PURGE] Room '${roomId}' is closed. All code, chat, snapshots, and voice data deleted.`);
+  }
+}
+
+  socket.on('leave-room', async ({ roomId }) => {
+    socket.leave(roomId);
+    userMap.delete(socket.id);
+    socket.to(roomId).emit('user-left', { socketId: socket.id });
+
+    const roomVoice = voiceRooms.get(roomId);
+    if (roomVoice && roomVoice.has(socket.id)) {
+      roomVoice.delete(socket.id);
+      socket.to(roomId).emit('voice-peer-left', { socketId: socket.id });
+      if (roomVoice.size === 0) {
+        voiceRooms.delete(roomId);
+      }
+    }
+
+    await purgeRoomIfEmpty(roomId);
+  });
+
+  socket.on('disconnecting', async () => {
+    const userData = userMap.get(socket.id);
+    const userRoomId = userData?.roomId;
+
+    if (userData) {
       userMap.delete(socket.id);
+
+      const rooms = Array.from(socket.rooms);
+      for (const roomId of rooms) {
+        if (roomId !== socket.id) {
+          socket.to(roomId).emit('user-left', { socketId: socket.id });
+
+          // Clean up voice if present
+          const roomVoice = voiceRooms.get(roomId);
+          if (roomVoice && roomVoice.has(socket.id)) {
+            roomVoice.delete(socket.id);
+            socket.to(roomId).emit('voice-peer-left', { socketId: socket.id });
+            if (roomVoice.size === 0) {
+              voiceRooms.delete(roomId);
+            }
+          }
+
+          // Auto-purge all room data if no users remain
+          await purgeRoomIfEmpty(roomId);
+        }
+      }
+    }
+
+    if (userRoomId) {
+      await purgeRoomIfEmpty(userRoomId);
     }
   });
 

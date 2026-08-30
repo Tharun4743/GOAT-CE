@@ -17,6 +17,14 @@ export interface ChatMessage {
   color: string;
 }
 
+export interface VoicePeer {
+  socketId: string;
+  user: User;
+  isMuted: boolean;
+  isDeafened: boolean;
+  isSpeaking?: boolean;
+}
+
 export interface RoomState {
   roomId: string;
   code: string;

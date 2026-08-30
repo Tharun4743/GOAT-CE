@@ -9,6 +9,9 @@ import TopBar from '../components/TopBar';
 import ChatBox from '../components/ChatBox';
 import Terminal from '../components/Terminal';
 import AIAssistant, { AIAssistantRef } from '../components/AIAssistant';
+import { useVoiceCall } from '../hooks/useVoiceCall';
+import IncomingCallModal from '../components/IncomingCallModal';
+import ActiveCallBar from '../components/ActiveCallBar';
 
 interface EditorPageProps {
   currentUser: User | null;
@@ -90,6 +93,8 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<'users' | 'chat' | 'history' | 'ai'>('users');
   const [isOffline, setIsOffline] = useState(false);
+  const [activeSocket, setActiveSocket] = useState<Socket | null>(null);
+  const voiceCall = useVoiceCall(activeSocket, roomId, currentUser);
 
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [terminalOutput, setTerminalOutput] = useState<string[]>([]);
@@ -97,6 +102,39 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewCode, setPreviewCode] = useState('');
   const [bottomTab, setBottomTab] = useState<'terminal' | 'preview'>('terminal');
+  const [terminalHeight, setTerminalHeight] = useState(280);
+  const isDraggingTerminalRef = useRef(false);
+  const startDragYRef = useRef(0);
+  const startHeightRef = useRef(280);
+
+  const handleTerminalResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingTerminalRef.current = true;
+    startDragYRef.current = e.clientY;
+    startHeightRef.current = terminalHeight;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isDraggingTerminalRef.current) return;
+      const deltaY = startDragYRef.current - moveEvent.clientY;
+      const minHeight = 120;
+      const maxHeight = Math.floor(window.innerHeight * 0.85);
+      const newHeight = Math.min(Math.max(startHeightRef.current + deltaY, minHeight), maxHeight);
+      setTerminalHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      isDraggingTerminalRef.current = false;
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  }, [terminalHeight]);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('goat_theme') as 'dark' | 'light') || 'dark';
   });
@@ -351,11 +389,15 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
 
     socket.on('connect', () => {
       setIsOffline(false);
+      setActiveSocket(socket);
       socket.emit('join-room', { roomId, username, color });
     });
 
     socket.on('connect_error', () => setIsOffline(true));
-    socket.on('disconnect', () => setIsOffline(true));
+    socket.on('disconnect', () => {
+      setIsOffline(true);
+      setActiveSocket(null);
+    });
 
     socket.on('sync-state', ({ code: sCode, language: sLang, snapshots: sSnaps, users: sUsers }) => {
       if (sCode !== undefined) {
@@ -411,6 +453,7 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
 
     const interval = setInterval(updateDecorations, 1000);
     return () => {
+      setActiveSocket(null);
       socket.disconnect();
       clearInterval(interval);
     };
@@ -1010,90 +1053,176 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
         toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         theme={theme}
         onToggleTheme={toggleTheme}
+        isVoiceActive={voiceCall.callStatus === 'connected'}
       />
+
+      {/* Active Call Bar (Persistent during incoming/active call) */}
+      {voiceCall.callStatus !== 'idle' && (
+        <ActiveCallBar
+          callStatus={voiceCall.callStatus}
+          activePeer={voiceCall.activePeer}
+          isMuted={voiceCall.isMuted}
+          localIsSpeaking={voiceCall.localIsSpeaking}
+          peerIsSpeaking={voiceCall.peerIsSpeaking}
+          callDuration={voiceCall.callDuration}
+          onToggleMute={voiceCall.toggleMute}
+          onEndCall={voiceCall.endActiveCall}
+          theme={theme}
+        />
+      )}
 
       <div className="flex flex-1 overflow-hidden relative">
         <div className={`fixed inset-y-0 left-0 z-50 md:relative md:z-20 ${isSidebarOpen ? 'w-80 translate-x-0' : 'w-0 -translate-x-full md:w-16 md:translate-x-0'} transition-all duration-300 border-r flex flex-col shrink-0 ${
           theme === 'dark' ? 'border-gray-800 bg-[#0d1117] text-gray-300' : 'border-indigo-100/80 bg-gradient-to-b from-indigo-50/50 via-white to-indigo-50/30 text-slate-800'
         }`}>
-          <button
-            onClick={() => setIsSidebarOpen(false)}
-            className={`md:hidden absolute -right-10 top-20 p-2 rounded-r-lg border ${
-              theme === 'dark' ? 'bg-gray-800 border-gray-700 text-gray-400' : 'bg-white border-indigo-100 text-slate-600'
-            }`}
-          >
-            ✕
-          </button>
-          <div className={`flex border-b shrink-0 ${theme === 'dark' ? 'border-gray-800' : 'border-indigo-100/80'}`}>
+          <div className={`flex border-b shrink-0 h-11 ${theme === 'dark' ? 'border-gray-800' : 'border-indigo-100/80'}`}>
             {[
-              { id: 'users', icon: ICONS.Users },
-              { id: 'chat', icon: ICONS.Chat },
-              { id: 'ai', icon: ICONS.AI },
-              { id: 'history', icon: ICONS.History }
+              { id: 'users', icon: ICONS.Users, title: 'Team Engine' },
+              { id: 'chat', icon: ICONS.Chat, title: 'Workspace Chat' },
+              { id: 'ai', icon: ICONS.AI, title: 'GOAT CE AI' },
+              { id: 'history', icon: ICONS.History, title: 'Code Timeline' }
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => { setIsSidebarOpen(true); setActiveTab(tab.id as any); }}
-                className={`flex-1 p-4 flex justify-center items-center transition-all ${
+                title={tab.title}
+                className={`flex-1 h-full flex justify-center items-center transition-all relative ${
                   activeTab === tab.id && isSidebarOpen
                     ? 'bg-indigo-500/10 text-indigo-500 border-b-2 border-indigo-500 font-bold'
                     : theme === 'dark' ? 'text-gray-500 hover:text-gray-300' : 'text-slate-400 hover:text-slate-700'
                 }`}
               >
                 {tab.icon}
+                {tab.id === 'chat' && voiceCall.callStatus === 'connected' && (
+                  <span className="absolute top-2.5 right-3 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-emerald-500/40 animate-pulse" />
+                )}
               </button>
             ))}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+          <div className="flex-1 overflow-hidden p-3 flex flex-col min-h-0">
             {isSidebarOpen && (
-              <div className="h-full">
+              <div className="h-full flex flex-col min-h-0">
                 {activeTab === 'users' && (
-                  <div className="space-y-3">
-                    <h3 className={`text-[10px] font-black uppercase tracking-widest ${theme === 'dark' ? 'text-gray-400' : 'text-indigo-600'}`}>Team Engine</h3>
-                    {activeUsers.map(user => {
-                      const status = getUserStatus(user);
-                      return (
-                        <div key={user.id} className={`flex items-center gap-3 p-2.5 rounded-xl border transition-colors ${
-                          theme === 'dark' ? 'border-transparent hover:bg-gray-800/40' : 'bg-white border-indigo-100 shadow-sm hover:border-indigo-200'
-                        }`}>
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black text-white shadow-lg shrink-0" style={{ backgroundColor: user.color }}>
-                            {user.username.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="flex flex-col min-w-0 flex-1">
-                            <span className={`text-xs font-extrabold truncate ${theme === 'dark' ? 'text-gray-200' : 'text-gray-900'}`}>{user.username} {user.id === currentUser?.id ? '(You)' : ''}</span>
-                            <div className="flex items-center gap-1.5">
-                              <div className={`w-1.5 h-1.5 rounded-full ${status.dot}`}></div>
-                              <span className={`text-[8px] font-black tracking-widest ${status.color}`}>{status.label}</span>
+                  <div className="flex flex-col h-full bg-transparent min-h-0">
+                    <div className={`shrink-0 px-3 py-2.5 border-b mb-3 flex items-center justify-between ${theme === 'dark' ? 'border-gray-800' : 'border-indigo-100'}`}>
+                      <h3 className={`text-xs font-black uppercase tracking-wider flex items-center gap-2 ${theme === 'dark' ? 'text-gray-200' : 'text-slate-700'}`}>
+                        {ICONS.Users} Team Engine
+                      </h3>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        theme === 'dark' ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-indigo-50 text-indigo-600 border-indigo-200'
+                      }`}>
+                        {activeUsers.length} Online
+                      </span>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-2.5 custom-scrollbar pr-1 min-h-0 pb-3">
+                      {activeUsers.map(user => {
+                        const status = getUserStatus(user);
+                        const isThisUserInCallWithMe = (voiceCall.callStatus === 'connected' || voiceCall.callStatus === 'calling') && voiceCall.activePeer?.socketId === user.id;
+                        const isSelf = user.id === currentUser?.id;
+                        return (
+                          <div key={user.id} className={`flex items-center gap-3 p-2.5 rounded-xl border transition-colors ${
+                            theme === 'dark' ? 'bg-[#161b22] border-gray-800 hover:border-gray-700' : 'bg-white border-indigo-100 shadow-sm hover:border-indigo-200'
+                          }`}>
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black text-white shadow-lg shrink-0 relative" style={{ backgroundColor: user.color }}>
+                              {user.username.charAt(0).toUpperCase()}
+                              {isThisUserInCallWithMe && voiceCall.peerIsSpeaking && (
+                                <span className="absolute -inset-0.5 rounded-lg border-2 border-emerald-400 animate-ping opacity-75 pointer-events-none"></span>
+                              )}
+                              {isSelf && voiceCall.callStatus === 'connected' && voiceCall.localIsSpeaking && (
+                                <span className="absolute -inset-0.5 rounded-lg border-2 border-emerald-400 animate-ping opacity-75 pointer-events-none"></span>
+                              )}
+                            </div>
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className={`text-xs font-extrabold truncate ${theme === 'dark' ? 'text-gray-200' : 'text-gray-900'}`}>{user.username} {isSelf ? '(You)' : ''}</span>
+                                
+                                {!isSelf && (
+                                  <div>
+                                    {voiceCall.callStatus === 'connected' && voiceCall.activePeer?.socketId === user.id ? (
+                                      <span className="flex items-center gap-1 text-[8px] font-black text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full border border-emerald-500/30">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                        Connected
+                                      </span>
+                                    ) : voiceCall.callStatus === 'calling' && voiceCall.activePeer?.socketId === user.id ? (
+                                      <span className="flex items-center gap-1 text-[8px] font-black text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded-full border border-indigo-500/30 animate-pulse">
+                                        Calling...
+                                      </span>
+                                    ) : (
+                                      <button
+                                        onClick={() => voiceCall.initiateCall(user.id, user)}
+                                        disabled={voiceCall.callStatus !== 'idle'}
+                                        className="py-1 px-2.5 rounded-lg text-[9px] font-extrabold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 transition-all flex items-center gap-1 shadow-sm disabled:opacity-30"
+                                        title={`Direct call ${user.username}`}
+                                      >
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                        </svg>
+                                        <span>Call</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <div className={`w-1.5 h-1.5 rounded-full ${status.dot}`}></div>
+                                <span className={`text-[9px] font-black tracking-wider uppercase ${status.color}`}>{status.label}</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
-                {activeTab === 'chat' && <ChatBox messages={messages} onSendMessage={handleSendMessage} theme={theme} />}
+
+                {activeTab === 'chat' && <ChatBox messages={messages} onSendMessage={handleSendMessage} theme={theme} voiceCall={voiceCall} currentUser={currentUser} />}
                 {activeTab === 'ai' && <AIAssistant currentCode={codeValueRef.current} language={language} onApplyCode={handleApplyAI} theme={theme} />}
+
                 {activeTab === 'history' && (
-                  <div className="space-y-2.5">
-                    <h3 className={`text-[10px] font-black uppercase tracking-widest ${theme === 'dark' ? 'text-gray-400' : 'text-indigo-600'}`}>Code Timeline</h3>
-                    {snapshots.length === 0 ? (
-                      <div className={`text-[11px] font-medium italic p-3 rounded-xl border ${theme === 'dark' ? 'text-gray-500 border-gray-800 bg-[#161b22]' : 'text-gray-600 border-indigo-100 bg-white shadow-sm'}`}>No snapshots captured yet.</div>
-                    ) : (
-                      snapshots.map((snap, i) => (
-                        <button key={i} onClick={() => { applyCodeToEditor(snap.code); if (socketRef.current?.connected) socketRef.current.emit('code-change', { roomId, code: snap.code, language: snap.language }); }} className={`w-full text-left p-3.5 border rounded-xl hover:border-indigo-500 transition-all group shadow-sm ${
-                          theme === 'dark' ? 'bg-[#161b22] border-gray-700 text-gray-200' : 'bg-white border-indigo-200 text-gray-900 hover:shadow-md'
-                        }`}>
-                          <div className={`flex justify-between text-[10px] mb-1.5 font-mono font-extrabold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-900'}`}>
-                            <span>{snap.language.toUpperCase()}</span>
-                            <span className={theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'}>{new Date(snap.timestamp).toLocaleTimeString()}</span>
-                          </div>
-                          <div className={`text-[9px] font-black tracking-wider uppercase flex items-center gap-1 ${theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'}`}>
-                            <span>↩</span> Rollback Context
-                          </div>
-                        </button>
-                      ))
-                    )}
+                  <div className="flex flex-col h-full bg-transparent min-h-0">
+                    <div className={`shrink-0 px-3 py-2.5 border-b mb-3 flex items-center justify-between ${theme === 'dark' ? 'border-gray-800' : 'border-indigo-100'}`}>
+                      <h3 className={`text-xs font-black uppercase tracking-wider flex items-center gap-2 ${theme === 'dark' ? 'text-gray-200' : 'text-slate-700'}`}>
+                        {ICONS.History} Code Timeline
+                      </h3>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                        theme === 'dark' ? 'bg-gray-800/60 text-gray-400 border-gray-700/60' : 'bg-slate-100 text-slate-500 border-slate-200'
+                      }`}>
+                        {snapshots.length} {snapshots.length === 1 ? 'Snapshot' : 'Snapshots'}
+                      </span>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-2.5 custom-scrollbar pr-1 min-h-0 pb-3">
+                      {snapshots.length === 0 ? (
+                        <div className={`text-xs font-medium italic p-4 rounded-xl border text-center ${theme === 'dark' ? 'text-gray-500 border-gray-800 bg-[#161b22]' : 'text-slate-500 border-indigo-100 bg-white shadow-sm'}`}>
+                          No snapshots captured yet.
+                        </div>
+                      ) : (
+                        snapshots.map((snap, i) => (
+                          <button
+                            key={i}
+                            onClick={() => {
+                              applyCodeToEditor(snap.code);
+                              if (socketRef.current?.connected) socketRef.current.emit('code-change', { roomId, code: snap.code, language: snap.language });
+                            }}
+                            className={`w-full text-left p-3 border rounded-xl hover:border-indigo-500 transition-all group shadow-sm ${
+                              theme === 'dark' ? 'bg-[#161b22] border-gray-800 text-gray-200 hover:bg-gray-800/50' : 'bg-white border-indigo-100 text-gray-900 hover:shadow-md'
+                            }`}
+                          >
+                            <div className="flex justify-between items-center text-xs mb-1 font-mono font-bold">
+                              <span className="text-indigo-400 uppercase">{snap.language}</span>
+                              <span className={`text-[10px] font-semibold ${theme === 'dark' ? 'text-gray-400' : 'text-slate-500'}`}>
+                                {new Date(snap.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <div className="text-[10px] font-bold tracking-wider uppercase flex items-center gap-1 text-indigo-400 group-hover:text-indigo-300">
+                              <span>↩</span> Rollback Context
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1114,21 +1243,33 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
             />
           </div>
 
-          {/* Unified Bottom Engine Console */}
+          {/* Unified Bottom Engine Console with Drag-Adjustable Height */}
           {isTerminalOpen && (
-            <div className="h-80 bg-[#0d1117] border-t border-gray-800 flex flex-col font-mono text-sm shadow-[0_-10px_30px_rgba(0,0,0,0.6)] z-40">
+            <div
+              style={{ height: `${terminalHeight}px` }}
+              className="bg-[#0d1117] border-t border-gray-800 flex flex-col font-mono text-sm shadow-[0_-10px_30px_rgba(0,0,0,0.6)] z-40 relative shrink-0 min-h-[120px] max-h-[85vh]"
+            >
+              {/* Drag Resize Handle Bar */}
+              <div
+                onMouseDown={handleTerminalResizeStart}
+                className="h-2 w-full cursor-row-resize bg-[#161b22] hover:bg-indigo-600/30 transition-colors flex items-center justify-center shrink-0 group select-none border-b border-gray-800/80"
+                title="Drag up or down to adjust panel height"
+              >
+                <div className="w-12 h-1 rounded-full bg-gray-600 group-hover:bg-indigo-400 transition-colors" />
+              </div>
+
               <div className="flex items-center justify-between px-4 py-1.5 bg-[#161b22] border-b border-gray-800 shrink-0">
                 <div className="flex items-center gap-6">
                   <div className="flex gap-2">
                     <button
                       onClick={() => setBottomTab('terminal')}
-                      className={`text-[9px] font-black uppercase tracking-[0.2em] py-1 transition-all ${bottomTab === 'terminal' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-600 hover:text-gray-400'}`}
+                      className={`text-[10px] font-bold uppercase tracking-wider py-1 transition-all ${bottomTab === 'terminal' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'}`}
                     >
                       Output Logs
                     </button>
                     <button
                       onClick={() => setBottomTab('preview')}
-                      className={`text-[9px] font-black uppercase tracking-[0.2em] py-1 transition-all ${bottomTab === 'preview' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-600 hover:text-gray-400'}`}
+                      className={`text-[10px] font-bold uppercase tracking-wider py-1 transition-all ${bottomTab === 'preview' ? 'text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-500 hover:text-gray-300'}`}
                     >
                       Visual Preview
                     </button>
@@ -1136,11 +1277,11 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="flex gap-1.5">
-                    <div className="w-2 h-2 rounded-full bg-[#ff5f56]/40"></div>
-                    <div className="w-2 h-2 rounded-full bg-[#ffbd2e]/40"></div>
-                    <div className="w-2 h-2 rounded-full bg-[#27c93f]/40"></div>
+                    <div className="w-2 h-2 rounded-full bg-[#ff5f56]/70"></div>
+                    <div className="w-2 h-2 rounded-full bg-[#ffbd2e]/70"></div>
+                    <div className="w-2 h-2 rounded-full bg-[#27c93f]/70"></div>
                   </div>
-                  <button onClick={() => setIsTerminalOpen(false)} className="text-gray-600 hover:text-white transition-colors">✕</button>
+                  <button onClick={() => setIsTerminalOpen(false)} className="text-gray-500 hover:text-white transition-colors text-xs font-bold p-1">✕</button>
                 </div>
               </div>
 
@@ -1159,6 +1300,7 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
                           language === 'css' ? `<html><head><style>${previewCode}</style></head><body style="padding: 2rem; font-family: sans-serif; background: #f8fafc;"><h2>CSS Logic Mask</h2><p>Styles are active in the lower engine.</p></body></html>` :
                             `<html><body style="padding: 2rem; font-family: sans-serif; background: #f8fafc;"><h2>Script Terminal</h2><p>Check the system logs for runtime details.</p><script>${previewCode}</script></body></html>`
                       }
+                      sandbox="allow-scripts"
                     />
                   </div>
                 )}
@@ -1167,6 +1309,16 @@ const EditorPage: React.FC<EditorPageProps> = ({ currentUser: propUser }) => {
           )}
         </div>
       </div>
+
+      {/* Incoming Call Modal Overlay */}
+      {voiceCall.incomingCall && (
+        <IncomingCallModal
+          caller={voiceCall.incomingCall.caller}
+          onAccept={voiceCall.acceptIncomingCall}
+          onReject={voiceCall.rejectIncomingCall}
+          theme={theme}
+        />
+      )}
     </div>
   );
 };

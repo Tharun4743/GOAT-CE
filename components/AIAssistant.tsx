@@ -141,20 +141,24 @@ Rules:
 
   return (
     <div className="flex flex-col h-full bg-transparent min-h-0">
-      <div className={`shrink-0 p-2 border-b mb-2 flex items-center justify-between ${isDark ? 'border-gray-800' : 'border-indigo-100'}`}>
-        <h3 className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+      <div className={`shrink-0 px-3 py-2.5 border-b mb-3 flex items-center justify-between ${isDark ? 'border-gray-800' : 'border-indigo-100'}`}>
+        <h3 className={`text-xs font-black uppercase tracking-wider flex items-center gap-2 ${isDark ? 'text-gray-200' : 'text-slate-700'}`}>
           {ICONS.AI} GOAT CE AI
         </h3>
-        <span className="text-[7px] bg-indigo-500/10 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-500/20 font-black uppercase">V3_STABLE</span>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+          isDark ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' : 'bg-indigo-50 text-indigo-600 border-indigo-200'
+        }`}>
+          Active
+        </span>
       </div>
 
-      <div className="shrink-0 flex gap-2 overflow-x-auto pb-3 custom-scrollbar scrollbar-hide">
+      <div className="shrink-0 flex gap-2 overflow-x-auto pb-2.5 custom-scrollbar scrollbar-hide">
         {QUICK_ACTIONS.map(action => (
           <button
             key={action.name}
             onClick={() => handleQuickAction(action.name)}
             disabled={isTyping}
-            className={`whitespace-nowrap text-[9px] font-extrabold px-3 py-1.5 rounded-lg transition-all active:scale-95 disabled:opacity-30 uppercase border ${
+            className={`whitespace-nowrap text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition-all active:scale-95 disabled:opacity-30 uppercase border ${
               isDark 
                 ? 'bg-[#161b22] hover:bg-indigo-500/10 border-gray-700 hover:border-indigo-500/30 text-gray-300 hover:text-indigo-400' 
                 : 'bg-white hover:bg-indigo-50 border-indigo-200 text-indigo-700 hover:text-indigo-900 shadow-sm'
@@ -165,12 +169,12 @@ Rules:
         ))}
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-1 min-h-0 pb-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-1 min-h-0 pb-3">
         {messages.map((msg, idx) => {
           const hasCode = msg.role === 'ai' && msg.content.includes('```');
           return (
-            <div key={idx} className={`flex flex-col space-y-1.5 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-              <div className={`max-w-[95%] p-3.5 rounded-xl text-xs border shadow-sm ${
+            <div key={idx} className={`flex flex-col space-y-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+              <div className={`max-w-[95%] p-3 rounded-xl text-xs border shadow-sm ${
                 msg.role === 'user' 
                   ? isDark 
                     ? 'bg-indigo-600/30 border-indigo-500/40 text-indigo-100 rounded-tr-none font-medium' 
@@ -185,7 +189,7 @@ Rules:
                 {hasCode && onApplyCode && (
                   <button 
                     onClick={() => extractAndApply(msg.content)}
-                    className={`mt-3 w-full border text-[9px] font-black py-2 rounded-lg transition-all flex items-center justify-center gap-2 uppercase tracking-widest ${
+                    className={`mt-2.5 w-full border text-[10px] font-bold py-1.5 rounded-lg transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider ${
                       isDark 
                         ? 'bg-indigo-600/20 hover:bg-indigo-600/40 border-indigo-500/30 text-indigo-400' 
                         : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-600 shadow-md'
@@ -199,30 +203,30 @@ Rules:
           );
         })}
         {isTyping && (
-          <div className="flex gap-1.5 items-center p-3 text-indigo-600 animate-pulse">
-            <div className="w-1.5 h-1.5 rounded-full bg-indigo-600"></div>
-            <div className="w-1.5 h-1.5 rounded-full bg-indigo-600"></div>
-            <span className="text-[9px] font-black uppercase tracking-widest">Processing Logic...</span>
+          <div className="flex gap-1.5 items-center p-2.5 text-indigo-500 animate-pulse">
+            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+            <span className="text-[10px] font-bold uppercase tracking-wider">Processing Logic...</span>
           </div>
         )}
       </div>
 
-      <form onSubmit={handleSend} className={`shrink-0 mt-2 pt-3 border-t ${isDark ? 'border-gray-800' : 'border-indigo-100'}`}>
+      <form onSubmit={handleSend} className={`shrink-0 mt-2 pt-2.5 border-t ${isDark ? 'border-gray-800' : 'border-indigo-100'}`}>
         <div className="relative group">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask GOAT CE AI..."
-            className={`w-full rounded-xl py-3 px-5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400 transition-all pr-12 border ${
+            className={`w-full rounded-xl py-2.5 px-3.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all pr-10 border ${
               isDark 
-                ? 'bg-[#0d1117] border-gray-700 text-white placeholder:text-gray-500 focus:border-indigo-500' 
-                : 'bg-white border-indigo-200 text-gray-900 placeholder:text-gray-400 focus:border-indigo-400 shadow-sm font-medium'
+                ? 'bg-[#161b22] border-gray-700 text-white placeholder:text-gray-500' 
+                : 'bg-slate-100 border-slate-300 text-slate-800 placeholder:text-slate-400 font-medium'
             }`}
           />
           <button 
             type="submit"
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-indigo-600 hover:text-indigo-500 transition-all disabled:opacity-30"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-indigo-500 hover:text-indigo-400 transition-all disabled:opacity-30"
             disabled={!input.trim() || isTyping}
           >
             {ICONS.AI}

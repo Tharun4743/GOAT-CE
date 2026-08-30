@@ -12,6 +12,7 @@ interface TopBarProps {
   toggleSidebar: () => void;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
+  isVoiceActive?: boolean;
 }
 
 const TopBar: React.FC<TopBarProps> = ({
@@ -22,7 +23,8 @@ const TopBar: React.FC<TopBarProps> = ({
   onRun,
   toggleSidebar,
   theme,
-  onToggleTheme
+  onToggleTheme,
+  isVoiceActive
 }) => {
   const [copied, setCopied] = useState(false);
   const isDark = theme === 'dark';
@@ -50,13 +52,18 @@ const TopBar: React.FC<TopBarProps> = ({
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-1 md:gap-2">
             <h1 className={`text-xs md:text-sm font-black leading-none tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>GOAT Code Editor</h1>
-            <span className="hidden sm:inline-block bg-indigo-500/10 text-indigo-400 text-[8px] px-1.5 py-0.5 rounded border border-indigo-500/20 font-black uppercase">v1.0</span>
           </div>
           <div className={`flex items-center gap-2 text-[9px] md:text-[10px] mt-0.5 md:mt-1 ${isDark ? 'text-gray-500' : 'text-slate-500'}`}>
             <span className="flex items-center gap-1 truncate">
               <span className="hidden xs:inline">Room:</span> <span className="text-indigo-400 font-mono select-all cursor-pointer hover:text-indigo-300 transition-colors" onClick={copyRoomId}>{roomId}</span>
             </span>
             {copied && <span className="text-green-500 hidden sm:flex items-center gap-1 font-bold animate-in fade-in zoom-in duration-200">{ICONS.Check} Copied</span>}
+            {isVoiceActive && (
+              <span className="hidden sm:inline-flex items-center gap-1 text-[8px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30 animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                LIVE CALL
+              </span>
+            )}
           </div>
         </div>
       </div>
