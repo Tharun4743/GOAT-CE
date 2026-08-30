@@ -183,22 +183,9 @@ cd GOAT-CE
 npm install
 ```
 
-### 2. Configure Environment Variables
-Create a `.env` file in the root directory:
-```env
-PORT=5001
-NODE_ENV=development
-DATABASE_URL=postgresql://user:password@localhost:5432/goat_editor
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
-OPENROUTER_API_KEY=your_openrouter_key
-OPENROUTER_MODEL=meta-llama/llama-3.1-70b-instruct
-```
-
-### 3. Run the Application
+### 2. Run the Application
 ```bash
-# Option A: Single Unified Production Server (serves frontend & backend on port 5001)
+# Option A: Single Unified Server (serves frontend & backend on port 5001)
 npm run build
 npm start
 
