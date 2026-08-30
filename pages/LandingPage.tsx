@@ -30,7 +30,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onJoin }) => {
   const handleCreateRoom = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const finalUsername = username.trim() || `Dev-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-    // Generate a clean 6-character room ID
     const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     
     sessionStorage.setItem('goat_username', finalUsername);
@@ -45,13 +44,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onJoin }) => {
     const cleanRoomId = sanitizeRoomId(roomId);
 
     if (!cleanRoomId) {
-      // If Room ID is empty, create a new one smoothly
-      handleCreateRoom();
+      setError('Please enter a Room ID to join, or click "Create New Room".');
       return;
     }
 
     if (cleanRoomId.length < 2 || cleanRoomId.length > 20) {
-      setError('Room ID must be between 2 and 20 characters long.');
+      setError('Room ID must be between 2 and 20 characters.');
       return;
     }
 
@@ -60,15 +58,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onJoin }) => {
     localStorage.setItem('goat_username', finalUsername);
     onJoin(finalUsername, cleanRoomId);
     navigate(`/editor/${cleanRoomId}`);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (roomId.trim()) {
-      handleJoinRoom();
-    } else {
-      handleCreateRoom();
-    }
   };
 
   return (
@@ -126,7 +115,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onJoin }) => {
               </h1>
               <div className="flex items-center justify-center gap-3">
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent to-indigo-200/60" />
-                <p className="text-indigo-400 text-[8px] sm:text-[9px] font-black uppercase tracking-[0.4em]">Engineered for Teams</p>
+                <p className="text-indigo-400 text-[8px] sm:text-[9px] font-black uppercase tracking-[0.4em]">Real-time Collaborative IDE</p>
                 <div className="h-px flex-1 bg-gradient-to-l from-transparent to-indigo-200/60" />
               </div>
             </div>
@@ -143,19 +132,19 @@ const LandingPage: React.FC<LandingPageProps> = ({ onJoin }) => {
           )}
 
           {/* Form */}
-          <form className="space-y-3.5" onSubmit={handleSubmit}>
+          <form className="space-y-3.5" onSubmit={handleJoinRoom}>
             <div className="space-y-2.5">
               {/* Username */}
               <div className="group space-y-1">
                 <label className="block text-[8px] sm:text-[9px] font-bold text-indigo-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-indigo-600">
-                  Developer Profile
+                  Your Username
                 </label>
                 <div className="relative">
                   <input
                     type="text"
                     value={username}
                     onChange={(e) => { setUsername(e.target.value); setError(null); }}
-                    placeholder="Tharunkumar"
+                    placeholder="Enter your name (e.g. Tharunkumar)"
                     className="w-full bg-indigo-50/60 border border-indigo-100 rounded-xl px-3.5 sm:px-4 py-2.5 text-gray-800 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-300/60 focus:border-indigo-300 transition-all placeholder:text-gray-300 shadow-inner"
                   />
                   <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-indigo-300 transition-colors group-focus-within:text-indigo-400">
@@ -167,36 +156,41 @@ const LandingPage: React.FC<LandingPageProps> = ({ onJoin }) => {
               {/* Room ID */}
               <div className="group space-y-1">
                 <label className="block text-[8px] sm:text-[9px] font-bold text-indigo-400 uppercase tracking-widest ml-1 transition-colors group-focus-within:text-indigo-600">
-                  Room ID or Invite Link
+                  Room ID (To Join Existing Room)
                 </label>
                 <input
                   type="text"
                   value={roomId}
                   onChange={(e) => { setRoomId(e.target.value); setError(null); }}
-                  placeholder="ENTER ROOM ID OR PASTE LINK"
+                  placeholder="e.g. 12345 OR PASTE INVITE LINK"
                   className="w-full bg-indigo-50/60 border border-indigo-100 rounded-xl px-3.5 sm:px-4 py-2.5 text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-300/60 focus:border-indigo-300 transition-all font-mono placeholder:text-gray-300 uppercase tracking-[0.15em] text-center text-xs sm:text-sm shadow-inner"
                 />
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="grid grid-cols-1 gap-2 pt-0.5">
+            {/* Action Buttons: Join Room & Create New Room */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              {/* Join Existing Room */}
               <button
                 type="submit"
-                className="group relative w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-2.5 sm:py-3 px-5 rounded-xl transition-all shadow-[0_8px_32px_rgba(99,102,241,0.35)] hover:shadow-[0_12px_40px_rgba(99,102,241,0.45)] active:scale-[0.98] overflow-hidden"
+                className="group relative w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-2.5 sm:py-3 px-4 rounded-xl transition-all shadow-[0_8px_32px_rgba(99,102,241,0.3)] hover:shadow-[0_12px_40px_rgba(99,102,241,0.4)] active:scale-[0.98] overflow-hidden flex items-center justify-center gap-2 text-[10px] sm:text-[11px] uppercase tracking-wider"
               >
-                <span className="relative z-10 flex items-center justify-center gap-2 tracking-[0.15em] text-[10px] sm:text-[11px] uppercase font-black">
-                  {roomId.trim() ? 'Join Room' : 'Create New Room'}
-                </span>
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-shine duration-700" />
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                </svg>
+                <span>Join Room</span>
               </button>
 
+              {/* Create New Room */}
               <button
                 type="button"
                 onClick={() => handleCreateRoom()}
-                className="w-full bg-white border border-indigo-100 hover:border-indigo-300 hover:bg-indigo-50 text-indigo-600 hover:text-indigo-700 font-bold py-2 sm:py-2.5 px-4 rounded-xl transition-all uppercase text-[9px] sm:text-[10px] tracking-[0.15em] shadow-sm active:scale-[0.98]"
+                className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-2.5 sm:py-3 px-4 rounded-xl transition-all shadow-[0_8px_32px_rgba(16,185,129,0.25)] hover:shadow-[0_12px_40px_rgba(16,185,129,0.35)] active:scale-[0.98] flex items-center justify-center gap-2 text-[10px] sm:text-[11px] uppercase tracking-wider"
               >
-                Generate New Instance
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Create Room</span>
               </button>
             </div>
           </form>
