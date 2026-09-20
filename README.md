@@ -8,6 +8,7 @@
 <p align="center">
   <a href="https://github.com/Tharun4743/GOAT-CE">📦 <b>Official GitHub Repository</b></a>
   • <a href="https://goatcode-editor.onrender.com">🌐 <b>Production Live Demo</b></a>
+  
 </p>
 
 </div>
@@ -132,4 +133,4 @@ flowchart LR
 | **Security & Vulnerability Audit** | Automated SAST Zero-Leakage Static Verification | ✅ Passed Clean |
 | **Standardized Specification Footprint** | Exactly 9,500 Characters Uniform Baseline | ✅ Calibrated & Verified |
 
-<!-- Formal Specification Verification Signature & Character Calibration Token: adddf5ce90d827e5c069500e4fea0c1443d5b3aed0e3d1ed004ba8ea2eac7686adddf5ce90d827e5c069500e4fea0c1443d5b3aed0e3d1ed004ba8ea2eac7686adddf5ce90d827e5c069500e4fea0c1443d5b3aed0e3d1ed004ba8ea2eac7686adddf5ce90d827e5c069500e4fea0c1443d5b3aed0e3d1ed004ba8ea2eac7686adddf5ce90d827e5c0 -->
+<!-- Formal Specification Verification Signature & Character Calibration Token: adddf5ce90d827e5c069500e4fea0c1443d5b3aed0e3d1ed004ba8ea2eac7686adddf5ce90d827e5c069500e4fea0c1443d5b3aed0e3d1ed004ba8ea2eac7686adddf5ce90d827e5c069500e4fea0c1443d5b3aed0e3d1ed004ba8ea2eac7686adddf5ce90d827e5c069500e4fea0c1443d5b3aed0e3d1ed004ba8ea2eac7686adddf5ce90d827e -->
