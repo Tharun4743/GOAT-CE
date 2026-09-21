@@ -46,7 +46,7 @@ Engineers conducting technical interviews, pair programming, or hackathons face 
 
 * 🎙️ **Pure WebRTC Voice Mesh (Zero SDKs):** Signaling architecture managing SDP handshakes, ICE relays, encrypted audio, and VAD.
 * 📝 **Sub-Pixel Operational Transformation:** Real-time diff streaming broadcasting cursor positions, user colors, and typing status.
-* ⚙️ **13+ Language Sandboxed Execution:** Multi-language compiler running JS, TS, Python, Java, C++, Go, and Rust via Piston API v2.
+* ⚙️ **13+ Language Sandboxed Execution:** Multi-language compiler running JS, TS, Python, Java, C++, Go via Piston API v2.
 * 🤖 **Integrated OpenRouter AI Assistant:** Embedded LLaMA 3.1 70B AI panel for instant algorithmic refactoring and bug diagnosis.
 * ⚡ **Ephemeral Dual-Persistence Engine:** Persistent room states stored in PostgreSQL 16 with in-memory fallback cache.
 
