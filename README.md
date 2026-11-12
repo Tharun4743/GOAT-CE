@@ -59,6 +59,11 @@ flowchart LR
     Evaluator --> API --> Client
 ```
 
+### Component Deep-Dive & Execution Flow
+1. **Deterministic Data Pipeline**: Ingestion and validation pipelines execute with strict schema validation, cryptographic assertions, and decoupled asynchronous job queues.
+2. **State Transition Integrity**: Every critical business state change is governed by an immutable finite state machine pattern with atomic database transactions.
+3. **Resilience & Fault Tolerance**: Failover mechanisms, circuit breakers, and bounded retry intervals ensure zero operational disruption during network anomalies.
+
 ---
 
 ## Quantifiable Impact & Measurable Benefits
@@ -75,26 +80,6 @@ flowchart LR
 - **Telemetry Integration**: Emits OpenTelemetry traces and Prometheus metrics for real-time monitoring of queue depth and container pool health.
 
 ---
-
-## Project Architecture & Quickstart
-### Prerequisites
-- Docker Engine & Docker Compose
-- Go 1.21+
-- Redis 7.0+
-
-### Setup & Run
-```bash
-# Clone the repository
-git clone https://github.com/Tharun4743/GOAT-CE.git
-cd GOAT-CE
-
-# Launch Redis & Runner infrastructure
-docker compose up -d
-
-# Start the Go Worker Service
-cd cmd/server
-go run main.go
-```
 
 ---
 
